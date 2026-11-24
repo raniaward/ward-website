@@ -97,6 +97,17 @@ body.arabic{direction:rtl;font-family:Tahoma,Arial,sans-serif}
  .logo img{height:42px}.country{max-width:118px;font-size:13px}.lang{padding:6px 12px}
  .wa{bottom:96px;left:14px;width:52px;height:52px}
 }
+
+.sponsor{display:grid;grid-template-columns:1.2fr 1fr;gap:34px;align-items:center;background:linear-gradient(135deg,#85000f,#c0313f);color:#fff;border-radius:28px;padding:46px 44px}
+.sponsor h2{color:#fff;text-align:start;margin:10px 0}
+.sponsor p{opacity:.95;margin-bottom:18px}
+.sponsor .btn{background:#f6f4ec;color:#85000f;margin:0}
+.tag{display:inline-block;background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.4);padding:3px 14px;border-radius:20px;font:13px Arial,sans-serif}
+.slots{display:grid;gap:12px}
+.slot{border:2px dashed rgba(255,255,255,.55);border-radius:16px;padding:16px;text-align:center;font-family:Arial,sans-serif}
+.slot b{display:block;font-size:18px;letter-spacing:2px}
+.slot span{font-size:13px;opacity:.85}
+@media(max-width:700px){.sponsor{grid-template-columns:1fr;padding:34px 22px}.sponsor h2{font-size:26px}}
 </style>
 </head>
 <body>
@@ -209,6 +220,21 @@ function loadTranslate(b){b.style.display='none';var s=document.createElement('s
 </div>
 </div>
 </section>
+
+<section id="sponsors"><div class="sponsor">
+<div>
+<span class="tag"><span class="en">Founding sponsors · spots open</span><span class="ar">الرعاة المؤسِّسون · أماكن متاحة</span></span>
+<h2 class="en">Put your brand behind women founders</h2><h2 class="ar">ضع علامتك التجارية خلف رائدات الأعمال</h2>
+<p class="en">Become a founding sponsor of WARD in the UAE. Packages can include your logo on wardworld.org, visibility with our sellers and shoppers, and a place in our launch campaign.</p>
+<p class="ar">كن من الرعاة المؤسِّسين لورد في الإمارات. يمكن أن تشمل الباقات شعارك على موقع ورد، وظهوراً أمام مورّداتنا ومتسوّقينا، ومكاناً في حملة الإطلاق.</p>
+<a href="#corporate" class="btn" onclick="var t=document.querySelector('select[name=topic]');if(t)t.selectedIndex=2"><span class="en">Become a sponsor · Get the deck</span><span class="ar">كن راعياً · اطلب العرض</span></a>
+</div>
+<div class="slots">
+<div class="slot"><b>PLATINUM</b><span class="en">Your logo here</span><span class="ar">شعارك هنا</span></div>
+<div class="slot"><b>GOLD</b><span class="en">Your logo here</span><span class="ar">شعارك هنا</span></div>
+<div class="slot"><b>SILVER</b><span class="en">Your logo here</span><span class="ar">شعارك هنا</span></div>
+</div>
+</div></section>
 
 <section id="about">
 <h2 class="en">Meet the founder</h2><h2 class="ar">تعرّفي على المؤسِّسة</h2>
@@ -384,7 +410,7 @@ function loadTranslate(b){b.style.display='none';var s=document.createElement('s
 
 <a class="wa" href="https://wa.me/971527043491?text=%D9%85%D8%B1%D8%AD%D8%A8%D8%A7%D9%8B%D8%8C%20%D8%A3%D8%A8%D8%BA%D9%89%20%D8%A3%D8%B9%D8%B1%D9%81%20%D8%A3%D9%83%D8%AB%D8%B1%20%D8%B9%D9%86%20%D9%88%D8%B1%D8%AF" target="_blank" rel="noopener" aria-label="WhatsApp">💬</a>
 
-<elevenlabs-convai agent-id="agent_2001m840h2f0f1h8bjwt7n7b8ezr"></elevenlabs-convai>
+<elevenlabs-convai agent-id="agent_2001m840h2f0f1h8bjwt7n7b8ezr" avatar-image-url="https://wardworld.org/warda.svg" action-text="تحتاجين مساعدة؟ كلّمي وردة 🌷" start-call-text="كلّمي وردة" end-call-text="إنهاء" listening-text="وردة تسمعك..." speaking-text="وردة تتكلم"></elevenlabs-convai>
 <script src="https://unpkg.com/@elevenlabs/convai-widget-embed" async type="text/javascript"></script>
 <script>
 // visible labels from placeholders (easier for sellers; screen-reader friendly)
