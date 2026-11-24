@@ -31,11 +31,14 @@ nav a{color:#85000f;text-decoration:none;margin:0 7px;font-family:Arial,sans-ser
 .gold{background:#c0313f;color:#fff}
 .light{background:#fff;color:#85000f;border:2px solid #85000f}
 .lang{background:none;border:2px solid #85000f;color:#85000f;padding:7px 16px;border-radius:30px;cursor:pointer;font-size:14px}
-.hero{text-align:center;padding:60px 24px 50px;background:#e6ead9;border-radius:0 0 32px 32px;margin-bottom:10px}
-.hero .mark{height:120px;width:auto;margin:0 auto 10px;display:block}
+.hero{display:grid;grid-template-columns:1.1fr .9fr;gap:40px;align-items:center;text-align:start;padding:50px 48px;background:#e6ead9;border-radius:0 0 32px 32px;margin-bottom:10px}
+.hero-img{width:100%;height:440px;object-fit:cover;border-radius:28px 28px 28px 120px;box-shadow:0 18px 40px rgba(133,0,15,.18)}
+body.arabic .hero-img{border-radius:28px 28px 120px 28px}
+.photo{filter:saturate(.88) sepia(.07) contrast(1.02)}
 .hero h1{font-size:44px;line-height:1.2;margin-bottom:16px;color:#85000f}
 .hero h1 span{color:#c0313f}
-.hero p{font-size:19px;max-width:640px;margin:0 auto 24px;color:#2a1a1c}
+.hero p{font-size:19px;max-width:560px;margin:0 0 24px;color:#2a1a1c}
+.hero .btn{margin:5px 8px 5px 0}
 .trust{display:flex;justify-content:center;gap:26px;flex-wrap:wrap;padding:22px 0;font-family:Arial,sans-serif;color:#85000f;font-size:15px}
 .flags{text-align:center;padding:20px 10px}
 .flags h3{color:#85000f;margin-bottom:8px}
@@ -46,6 +49,12 @@ h2{font-size:32px;text-align:center;margin-bottom:10px;color:#85000f}
 .sub{text-align:center;color:#4a5340;margin-bottom:28px}
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:20px}
 .card{background:#fff;padding:26px;border-radius:16px;box-shadow:0 4px 18px rgba(133,0,15,.08);text-align:center}
+.cat{padding:0;overflow:hidden}
+.cat img{width:100%;aspect-ratio:4/3;object-fit:cover;display:block}
+.cat h3{margin:12px 10px 14px;font-size:18px}
+.how{display:grid;grid-template-columns:.8fr 1.2fr;gap:30px;align-items:center}
+.how img{width:100%;height:100%;min-height:320px;object-fit:cover;border-radius:24px}
+.how .grid{grid-template-columns:repeat(2,1fr)}
 .card h3{color:#85000f;margin:8px 0}
 .card p{font-size:15px;color:#4f4a3e}
 .icon{font-size:42px}
@@ -81,7 +90,8 @@ body.arabic .ar{display:block}
 body.arabic span.ar,body.arabic a.ar{display:inline}
 body.arabic{direction:rtl;font-family:Tahoma,Arial,sans-serif}
 @media(max-width:700px){
- .hero{padding:36px 18px 34px}.hero .mark{height:84px}.hero h1{font-size:29px}.hero p{font-size:17px}
+ .hero{grid-template-columns:1fr;padding:0 0 30px;gap:18px;text-align:center}.hero-img{height:250px;border-radius:0 0 28px 28px!important;order:-1;box-shadow:none}.hero>div{padding:0 18px}.hero p{margin:0 auto 20px;font-size:17px}.hero h1{font-size:29px}
+ .how{grid-template-columns:1fr}.how img{min-height:200px;height:220px}
  .btn{display:block;margin:8px auto;max-width:320px}
  .founder{flex-direction:column;text-align:center}nav{display:none}
  .logo img{height:42px}.country{max-width:118px;font-size:13px}.lang{padding:6px 12px}
@@ -140,13 +150,15 @@ function loadTranslate(b){b.style.display='none';var s=document.createElement('s
 <div class="wrap">
 
 <div class="hero">
-<img class="mark" src="/logo.png" alt="">
+<div>
 <div class="en"><h1>Grow your home business <span>with WARD</span></h1>
 <p>The new marketplace for women-owned businesses, launching first in the UAE. Join the First 100 founding sellers. It's free to apply.</p></div>
 <div class="ar"><h1>كبّري مشروعك <span>مع ورد</span></h1>
 <p>السوق الجديد لمشاريع السيدات، ينطلق أولاً من الإمارات. انضمي إلى أول 100 مورّدة مؤسِّسة، والتسجيل مجاني.</p></div>
 <a href="#sell" class="btn"><span class="en">Join the First 100 sellers</span><span class="ar">انضمي لأول 100 مورّدة</span></a>
 <a href="#notify" class="btn light"><span class="en">Get early access to shop</span><span class="ar">سجّلي للتسوّق أولاً</span></a>
+</div>
+<img class="hero-img photo" src="https://images.unsplash.com/photo-1773146916231-e6aeae932080?w=900&h=1000&fit=crop&q=75&auto=format" alt="A woman working on her handmade business in her studio" fetchpriority="high">
 </div>
 
 <div class="trust">
@@ -187,11 +199,14 @@ function loadTranslate(b){b.style.display='none';var s=document.createElement('s
 <h2 class="en">How it works</h2><h2 class="ar">كيف يعمل ورد؟</h2>
 <p class="sub en">Not comfortable with phones? Warda, our Arabic voice assistant, will guide you step by step.</p>
 <p class="sub ar">ما تعرفين تستخدمين الجوال زين؟ وردة، مساعدتنا الصوتية، بتمشي معك خطوة بخطوة.</p>
+<div class="how">
+<img class="photo" src="https://images.unsplash.com/photo-1680034976850-129b4a07be56?w=700&h=800&fit=crop&q=75&auto=format" alt="Hands wrapping a handmade order in kraft paper" loading="lazy">
 <div class="grid">
 <div class="card"><div class="num">1</div><h3 class="en">Apply</h3><h3 class="ar">سجّلي</h3><p class="en">Fill the short form above.</p><p class="ar">املئي النموذج القصير.</p></div>
 <div class="card"><div class="num">2</div><h3 class="en">Get reviewed</h3><h3 class="ar">المراجعة</h3><p class="en">We check your business is woman-owned.</p><p class="ar">نتأكد أن المشروع مملوك لسيدة.</p></div>
 <div class="card"><div class="num">3</div><h3 class="en">Open your shop</h3><h3 class="ar">افتحي متجرك</h3><p class="en">Your own shop page and story.</p><p class="ar">صفحة متجر وقصة خاصة بك.</p></div>
 <div class="card"><div class="num">4</div><h3 class="en">Start selling</h3><h3 class="ar">ابدئي البيع</h3><p class="en">When WARD opens to shoppers.</p><p class="ar">عند افتتاح ورد للمتسوّقين.</p></div>
+</div>
 </div>
 </section>
 
@@ -321,14 +336,14 @@ function loadTranslate(b){b.style.display='none';var s=document.createElement('s
 <p class="sub en">Our founding sellers are joining now. Products go live when WARD opens.</p>
 <p class="sub ar">المورّدات المؤسِّسات ينضممن الآن، والمنتجات متاحة عند الافتتاح.</p>
 <div class="grid">
-<div class="card"><div class="icon">🍯</div><h3 class="en">Food & Sweets</h3><h3 class="ar">أكل وحلويات</h3></div>
-<div class="card"><div class="icon">👗</div><h3 class="en">Abayas & Fashion</h3><h3 class="ar">عبايات وأزياء</h3></div>
-<div class="card"><div class="icon">🌹</div><h3 class="en">Perfume & Oud</h3><h3 class="ar">عطور وعود</h3></div>
-<div class="card"><div class="icon">💄</div><h3 class="en">Beauty & Care</h3><h3 class="ar">جمال وعناية</h3></div>
-<div class="card"><div class="icon">🎁</div><h3 class="en">Gifts & Home</h3><h3 class="ar">هدايا وديكور</h3></div>
-<div class="card"><div class="icon">💍</div><h3 class="en">Jewellery & Accessories</h3><h3 class="ar">مجوهرات وإكسسوارات</h3></div>
-<div class="card"><div class="icon">🧸</div><h3 class="en">Kids</h3><h3 class="ar">أطفال</h3></div>
-<div class="card"><div class="icon">✂️</div><h3 class="en">Services & Classes</h3><h3 class="ar">خدمات ودورات</h3></div>
+<div class="card cat"><img class="photo" src="https://images.unsplash.com/photo-1786174045066-72297be6e9f4?w=600&h=450&fit=crop&q=75&auto=format" alt="Baklava and Arabic sweets" loading="lazy"><h3 class="en">Food & Sweets</h3><h3 class="ar">أكل وحلويات</h3></div>
+<div class="card cat"><img class="photo" src="https://images.unsplash.com/photo-1760083545495-b297b1690672?w=600&h=450&fit=crop&q=75&auto=format" alt="Beige embroidered abaya" loading="lazy"><h3 class="en">Abayas & Fashion</h3><h3 class="ar">عبايات وأزياء</h3></div>
+<div class="card cat"><img class="photo" src="https://images.unsplash.com/photo-1738414808975-201966230c59?w=600&h=450&fit=crop&q=75&auto=format" alt="Small amber oud perfume bottle" loading="lazy"><h3 class="en">Perfume & Oud</h3><h3 class="ar">عطور وعود</h3></div>
+<div class="card cat"><img class="photo" src="https://images.unsplash.com/photo-1748543668751-902d6461890d?w=600&h=450&fit=crop&q=75&auto=format" alt="Natural skincare products on beige" loading="lazy"><h3 class="en">Beauty & Care</h3><h3 class="ar">جمال وعناية</h3></div>
+<div class="card cat"><img class="photo" src="https://images.unsplash.com/photo-1612195325560-9d241f1e25cc?w=600&h=450&fit=crop&q=75&auto=format" alt="Gift tied with a brown ribbon" loading="lazy"><h3 class="en">Gifts & Home</h3><h3 class="ar">هدايا وديكور</h3></div>
+<div class="card cat"><img class="photo" src="https://images.unsplash.com/photo-1682823544433-aae34df4e3da?w=600&h=450&fit=crop&q=75&auto=format" alt="Gold jewellery on a cream box" loading="lazy"><h3 class="en">Jewellery & Accessories</h3><h3 class="ar">مجوهرات وإكسسوارات</h3></div>
+<div class="card cat"><img class="photo" src="https://images.unsplash.com/photo-1505003098838-83ce5356c228?w=600&h=450&fit=crop&q=75&auto=format" alt="Wooden toy train" loading="lazy"><h3 class="en">Kids</h3><h3 class="ar">أطفال</h3></div>
+<div class="card cat"><img class="photo" src="https://images.unsplash.com/photo-1764507768797-5b7de6eedcb7?w=600&h=450&fit=crop&q=75&auto=format" alt="Hands shaping clay in a pottery class" loading="lazy"><h3 class="en">Services & Classes</h3><h3 class="ar">خدمات ودورات</h3></div>
 </div>
 </section>
 
@@ -362,6 +377,7 @@ function loadTranslate(b){b.style.display='none';var s=document.createElement('s
 </div>
 <footer>© 2026 WARD · wardworld.org · <a href="mailto:rania@wardworld.org">rania@wardworld.org</a><br>
 <a href="https://www.instagram.com/wardworld30" target="_blank" rel="noopener">Instagram</a> · <a href="https://www.snapchat.com/@wardworld.org" target="_blank" rel="noopener">Snapchat</a> · <a href="https://wa.me/971527043491" target="_blank" rel="noopener">WhatsApp</a> · <a href="/privacy.html">Privacy · الخصوصية</a><br>
+<small style="opacity:.75">Photos: Unsplash (illustrative)</small><br>
 <button class="translate notranslate" onclick="loadTranslate(this)">🌐 More languages · لغات أخرى</button>
 <div id="google_translate_element"></div>
 </footer>
