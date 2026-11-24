@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>WARD Shop · سوق وَرد</title>
+<meta name="description" content="Shop products made by women-owned businesses across the UAE.">
+<link rel="icon" href="/favicon.png"><link rel="stylesheet" href="market.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.min.js"></script>
+<script src="ward.js"></script>
+</head>
+<body>
+<main class="wrap">
+  <h1>WARD Shop <span class="ar">· سوق وَرد</span></h1>
+  <p class="muted">Products made by women-owned businesses in the UAE. <span class="ar">منتجات من مشاريع نسائية في الإمارات.</span></p>
+  <div id="sellerHead"></div>
+  <input id="q" placeholder="Search · ابحثي عن منتج" style="max-width:420px;margin-top:14px">
+  <div class="chips" id="chips"></div>
+  <div class="grid" id="grid"><p class="muted">Loading…</p></div>
+</main>
+
+<div class="modal" id="pm"><div class="box"><button class="x" onclick="closePM()">×</button><div id="pmBody"></div></div></div>
+
+<script>
+header('shop');
+let ALL = [], CAT = '', SELLER = new URLSearchParams(location.search).get('shop');
+
+async function init() {
+  await loadRates();
+  $('#chips').innerHTML = `<button class="chip on" data-c="">All · الكل</button>` +
+    RATES.map(r => `<button class="chip" data-c="${r.key}">${esc(r.name_en)} · ${esc(r.name_ar)}</button>`).join('');
+  $$('#chips .chip').forEach(b => b.onclick = () => { CAT = b.dataset.c; $$('#chips .chip').forEach(x => x.classList.toggle('on', x === b)); render(); });
+  let q = sb.from('products').select('id,title,description,price,category,stock,images,seller_id,sellers!inner(shop_name,slug,emirate,status)')
+    .eq('status', 'active').eq('sellers.status', 'approved').order('created_at', { ascending: false }).limit(300);
+  if (SELLER) q = q.eq('sellers.slug', SELLER);
+  const { data, error } = await q;
+  if (error) { $('#grid').innerHTML = `<p class="empty">Could not load products: ${esc(error.message)}</p>`; return; }
+  ALL = data || [];
+  if (SELLER && ALL[0]) $('#sellerHead').innerHTML = `<div class="note">Shop: <b>${esc(ALL[0].sellers.shop_name)}</b> · ${esc(ALL[0].sellers.emirate || '')} — <a href="/market/">see all shops</a></div>`;
+  render();
+}
+
+function render() {
+  const t = $('#q').value.trim().toLowerCase();
+  const list = ALL.filter(p => (!CAT || p.category === CAT) && (!t || (p.title + ' ' + (p.description || '') + ' ' + p.sellers.shop_name).toLowerCase().includes(t)));
+  if (!list.length) {
+    $('#grid').innerHTML = `<div class="empty" style="grid-column:1/-1">
+      <p><b>The first shops are being onboarded now.</b></p>
+      <p class="ar">أول المتاجر بتنضم دلوقتي — قريباً هتلاقي منتجاتهم هنا.</p>
+      <p style="margin-top:14px"><a class="btn" href="/market/seller.html">Open your shop · افتحي متجرك</a></p></div>`;
+    return;
+  }
+  $('#grid').innerHTML = list.map(p => `<div class="prod" onclick="openPM(${p.id})">
+    <div class="ph" style="background-image:url('${esc(imgUrl(p.images[0]))}')"></div>
+    <div class="in"><b>${esc(p.title)}</b><span class="muted">${esc(p.sellers.shop_name)}</span><br><span class="price">${aed(p.price)}</span>
+    ${p.stock < 1 ? ' <span class="tag cancelled">sold out</span>' : ''}</div></div>`).join('');
+}
+$('#q').oninput = render;
+
+function openPM(id) {
+  const p = ALL.find(x => x.id === id); if (!p) return;
+  const imgs = p.images.length ? p.images : [''];
+  $('#pmBody').innerHTML = `<div class="pd">
+    <div><div class="main" id="mainImg" style="background-image:url('${esc(imgUrl(imgs[0]))}')"></div>
+      <div class="thumbs">${imgs.map(i => `<div style="background-image:url('${esc(imgUrl(i))}')" onclick="$('#mainImg').style.backgroundImage='url(${esc(imgUrl(i))})'"></div>`).join('')}</div></div>
+    <div><h2 style="margin-top:0">${esc(p.title)}</h2>
+      <p><a href="?shop=${encodeURIComponent(p.sellers.slug)}">${esc(p.sellers.shop_name)}</a> · <span class="muted">${esc(p.sellers.emirate || '')}</span></p>
+      <p class="price" style="font-size:22px;margin:10px 0">${aed(p.price)}</p>
+      <p class="muted">${esc(catName(p.category))}</p>
+      <p style="white-space:pre-line;margin:12px 0">${esc(p.description || '')}</p>
+      ${p.stock > 0 ? `<label>Quantity · الكمية</label><input type="number" id="qty" min="1" max="${p.stock}" value="1" style="max-width:110px">
+      <br><button class="btn" onclick="addCart(${p.id})">Add to cart · أضيفي للسلة</button>` : '<p><span class="tag cancelled">Sold out · نفدت الكمية</span></p>'}
+    </div></div>`;
+  $('#pm').classList.add('open');
+}
+function closePM() { $('#pm').classList.remove('open'); }
+$('#pm').onclick = e => { if (e.target.id === 'pm') closePM(); };
+function addCart(id) {
+  const p = ALL.find(x => x.id === id);
+  const q = Math.max(1, Math.min(p.stock, parseInt($('#qty').value) || 1));
+  Cart.add(id, q); closePM(); toast('Added to cart · تمت الإضافة للسلة');
+}
+init();
+</script>
+</body>
+</html>

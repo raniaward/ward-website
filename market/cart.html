@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Cart · السلة — WARD</title>
+<link rel="icon" href="/favicon.png"><link rel="stylesheet" href="market.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.min.js"></script>
+<script src="ward.js"></script>
+</head>
+<body>
+<main class="wrap" style="max-width:860px">
+  <h1>Your cart <span class="ar">· سلتك</span></h1>
+  <div id="items"><p class="muted">Loading…</p></div>
+  <div id="checkout" style="display:none">
+    <h2>Checkout · إتمام الطلب</h2>
+    <form class="card" id="cf">
+      <div class="row">
+        <div><label>Full name · الاسم</label><input name="name" required maxlength="80"></div>
+        <div><label>Mobile / WhatsApp · الموبايل</label><input name="phone" required placeholder="+971…" maxlength="20"></div>
+      </div>
+      <div class="row">
+        <div><label>Email (optional) · الإيميل</label><input name="email" type="email" maxlength="120"></div>
+        <div><label>Emirate · الإمارة</label><select name="emirate" required>${''}</select></div>
+      </div>
+      <label>Delivery address · عنوان التوصيل</label><textarea name="address" rows="2" required maxlength="300"></textarea>
+      <label>Notes for the seller (optional) · ملاحظات</label><textarea name="notes" rows="2" maxlength="300"></textarea>
+      <label>Payment · الدفع</label>
+      <div style="margin:6px 0 12px;line-height:2">
+        <label style="font-weight:normal"><input type="radio" name="pay" value="cod" checked style="width:auto;margin:0 6px"> Cash on delivery · الدفع عند الاستلام <span class="muted" id="codFee"></span></label>
+        <label style="font-weight:normal;opacity:.55"><input type="radio" name="pay" value="card" disabled style="width:auto;margin:0 6px"> Card — coming soon · الدفع بالكارت قريباً</label>
+      </div>
+      <div class="card" style="background:var(--cream)" id="sum"></div>
+      <label style="font-weight:normal;font-size:13.5px"><input type="checkbox" required style="width:auto;margin:0 6px"> I agree to the <a href="/terms.html" target="_blank">WARD Conditions of Use</a> and <a href="/privacy.html" target="_blank">Privacy Notice</a>. · أوافق على الشروط وسياسة الخصوصية.</label>
+      <br><button class="btn" id="placeBtn">Place order · أكّدي الطلب</button>
+    </form>
+  </div>
+  <div id="done" style="display:none" class="card"></div>
+</main>
+<script>
+header('');
+let PRODS = [], S = {};
+$('select[name=emirate]').innerHTML = EMIRATES.map(e => `<option>${e}</option>`).join('');
+
+async function init() {
+  await loadRates();
+  const { data: st } = await sb.from('ward_settings').select('delivery_fee,cod_fee').single();
+  S = st || { delivery_fee: 20, cod_fee: 7 };
+  $('#codFee').textContent = `(+${aed(S.cod_fee)} per shop)`;
+  const cart = Cart.get();
+  if (!cart.length) { $('#items').innerHTML = `<div class="empty"><p>Your cart is empty · السلة فاضية</p><p style="margin-top:12px"><a class="btn" href="/market/">Go shopping · تسوّقي</a></p></div>`; return; }
+  const { data } = await sb.from('products').select('id,title,price,stock,images,seller_id,sellers(shop_name)').in('id', cart.map(i => i.id));
+  PRODS = data || [];
+  // drop items no longer available
+  Cart.set(cart.filter(i => PRODS.some(p => p.id === i.id && p.stock > 0)));
+  draw();
+}
+
+function draw() {
+  const cart = Cart.get();
+  if (!cart.length) { $('#items').innerHTML = `<div class="empty">Your cart is empty · السلة فاضية — <a href="/market/">shop</a></div>`; $('#checkout').style.display = 'none'; return; }
+  const shops = {};
+  cart.forEach(i => { const p = PRODS.find(x => x.id === i.id); if (p) (shops[p.seller_id] = shops[p.seller_id] || { name: p.sellers.shop_name, rows: [] }).rows.push({ p, qty: i.qty }); });
+  $('#items').innerHTML = Object.values(shops).map(s => `<div class="card"><b>${esc(s.name)}</b>
+    ${s.rows.map(r => `<div class="split" style="align-items:center;border-top:1px solid #eee;margin-top:8px;padding-top:8px">
+      <span>${esc(r.p.title)}<br><span class="muted">${aed(r.p.price)}</span></span>
+      <span><input type="number" min="1" max="${r.p.stock}" value="${r.qty}" style="width:70px;margin:0" onchange="setQty(${r.p.id},this.value)">
+      <button class="btn small ghost" onclick="setQty(${r.p.id},0)">Remove</button></span></div>`).join('')}</div>`).join('');
+  $('#checkout').style.display = 'block';
+  summary();
+}
+function setQty(id, q) {
+  const p = PRODS.find(x => x.id === id); q = Math.min(parseInt(q) || 0, p ? p.stock : 0);
+  Cart.set(Cart.get().map(i => i.id === id ? { ...i, qty: q } : i).filter(i => i.qty > 0)); draw();
+}
+function summary() {
+  const cart = Cart.get(); let items = 0; const sellers = new Set();
+  cart.forEach(i => { const p = PRODS.find(x => x.id === i.id); if (p) { items += p.price * i.qty; sellers.add(p.seller_id); } });
+  const n = sellers.size, del = S.delivery_fee * n, cod = S.cod_fee * n;
+  $('#sum').innerHTML = `<div class="split"><span>Items · المنتجات</span><b>${aed(items)}</b></div>
+    <div class="split"><span>Delivery · التوصيل (${n} shop${n > 1 ? 's' : ''})</span><b>${aed(del)}</b></div>
+    <div class="split"><span>Cash-on-delivery fee · رسوم الدفع عند الاستلام</span><b>${aed(cod)}</b></div>
+    <div class="split" style="border-top:1px solid var(--line);margin-top:6px;padding-top:8px;font-size:17px"><span>Total · الإجمالي</span><b class="price">${aed(items + del + cod)}</b></div>
+    <p class="muted" style="margin-top:6px">Each shop sends its own delivery. Final total is confirmed on your order. · كل متجر بيوصّل طلبه.</p>`;
+}
+
+$('#cf').onsubmit = async e => {
+  e.preventDefault();
+  const f = new FormData(e.target), b = $('#placeBtn');
+  b.disabled = true; b.textContent = 'Placing…';
+  const { data, error } = await sb.rpc('place_order', {
+    p_items: Cart.get().map(i => ({ product_id: i.id, qty: i.qty })),
+    p_name: f.get('name'), p_phone: f.get('phone'), p_email: f.get('email') || null,
+    p_address: f.get('address'), p_emirate: f.get('emirate'), p_payment: f.get('pay'), p_notes: f.get('notes') || null
+  });
+  if (error) { toast(errMsg(error)); b.disabled = false; b.textContent = 'Place order · أكّدي الطلب'; return; }
+  Cart.set([]);
+  $('#items').style.display = 'none'; $('#checkout').style.display = 'none';
+  $('#done').style.display = 'block';
+  $('#done').innerHTML = `<h2 style="margin-top:0">Thank you! · شكراً ليكي 🌷</h2>
+    <p>Your order is placed. Each shop will contact you on WhatsApp to confirm delivery.</p>
+    <p class="ar">طلبك وصل. كل متجر هيكلمك على واتساب لتأكيد التوصيل.</p>
+    ${data.map(o => `<div class="split"><span>Order <b>${esc(o.ref)}</b></span><b>${aed(o.total)}</b></div>`).join('')}
+    <p class="muted" style="margin-top:8px">Pay cash on delivery. Keep your order number. · احتفظي برقم الطلب.</p>
+    <p style="margin-top:14px"><a class="btn" href="/market/">Back to shop · رجوع للسوق</a></p>`;
+};
+init();
+</script>
+</body>
+</html>

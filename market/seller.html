@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Seller Centre · مركز البائعات — WARD</title>
+<meta name="robots" content="noindex">
+<link rel="icon" href="/favicon.png"><link rel="stylesheet" href="market.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.min.js"></script>
+<script src="ward.js"></script>
+</head>
+<body>
+<main class="wrap" id="app"><p class="muted">Loading…</p></main>
+<div class="modal" id="pm"><div class="box"><button class="x" onclick="$('#pm').classList.remove('open')">×</button><div id="pmBody"></div></div></div>
+<script>
+header('seller');
+let USER = null, SELLER = null, TAB = 'products', PRODS = [];
+
+async function boot() {
+  await loadRates();
+  const { data: { session } } = await sb.auth.getSession();
+  USER = session && session.user;
+  if (!USER) return authView();
+  const { data } = await sb.from('sellers').select('*').eq('id', USER.id).maybeSingle();
+  SELLER = data;
+  if (!SELLER) return applyView();
+  dash();
+}
+sb.auth.onAuthStateChange((ev, s) => { const uid = s && s.user ? s.user.id : null; if ((ev === 'SIGNED_IN' || ev === 'SIGNED_OUT') && uid !== (USER && USER.id)) setTimeout(boot, 0); });
+
+/* ---------- AUTH ---------- */
+function authView(mode = 'login') {
+  $('#app').innerHTML = `<h1>Seller Centre <span class="ar">· مركز البائعات</span></h1>
+  <p class="muted">Open your WARD shop for free. Starter plan: no monthly fee — WARD earns only a commission when you sell.<br>
+  <span class="ar">افتحي متجرك على وَرد مجاناً — بدون اشتراك شهري، وَرد بتاخد عمولة بس لما تبيعي.</span></p>
+  <div class="card" style="max-width:460px;margin-top:18px">
+    <div class="tabs"><button class="${mode==='login'?'on':''}" onclick="authView('login')">Log in · دخول</button>
+    <button class="${mode==='signup'?'on':''}" onclick="authView('signup')">Create account · حساب جديد</button></div>
+    <form id="af">
+      ${mode==='signup' ? `<label>Full name · الاسم</label><input name="full_name" required maxlength="80">
+      <label>Mobile / WhatsApp · الموبايل</label><input name="phone" required maxlength="20" placeholder="+971…">` : ''}
+      <label>Email · الإيميل</label><input name="email" type="email" required>
+      <label>Password · كلمة السر</label><input name="password" type="password" required minlength="8">
+      <button class="btn">${mode==='signup' ? 'Create account · إنشاء حساب' : 'Log in · دخول'}</button>
+      ${mode==='login' ? `<p style="margin-top:12px"><a href="#" onclick="resetPw();return false">Forgot password? · نسيتي كلمة السر؟</a></p>` : ''}
+    </form></div>`;
+  $('#af').onsubmit = async e => {
+    e.preventDefault(); const f = new FormData(e.target);
+    if (mode === 'signup') {
+      const { error } = await sb.auth.signUp({ email: f.get('email'), password: f.get('password'),
+        options: { data: { full_name: f.get('full_name'), phone: f.get('phone') }, emailRedirectTo: location.origin + '/market/seller.html' } });
+      if (error) return toast(errMsg(error));
+      $('#app').innerHTML = `<div class="card" style="max-width:520px"><h2 style="margin-top:0">Check your email 📩</h2>
+        <p>We sent a confirmation link to <b>${esc(f.get('email'))}</b>. Open it to activate your account, then come back here.</p>
+        <p class="ar">بعتنالك لينك تأكيد على الإيميل. افتحيه وبعدين ارجعي هنا.</p></div>`;
+    } else {
+      const { error } = await sb.auth.signInWithPassword({ email: f.get('email'), password: f.get('password') });
+      if (error) toast(errMsg(error));
+    }
+  };
+}
+async function resetPw() {
+  const em = $('input[name=email]').value; if (!em) return toast('Type your email first · اكتبي الإيميل الأول');
+  const { error } = await sb.auth.resetPasswordForEmail(em, { redirectTo: location.origin + '/market/seller.html#reset' });
+  toast(error ? errMsg(error) : 'Reset link sent · بعتنالك لينك');
+}
+if (location.hash.includes('type=recovery') || location.hash === '#reset') {
+  sb.auth.onAuthStateChange(async ev => { if (ev === 'PASSWORD_RECOVERY') {
+    const pw = prompt('New password (8+ characters) · كلمة سر جديدة'); if (pw) { const { error } = await sb.auth.updateUser({ password: pw }); toast(error ? errMsg(error) : 'Password updated'); } } });
+}
+
+/* ---------- APPLY ---------- */
+function shopForm(s = {}) {
+  return `<div class="row"><div><label>Shop name · اسم المتجر</label><input name="shop_name" required maxlength="60" value="${esc(s.shop_name)}"></div>
+    <div><label>Main category · الفئة</label><select name="category" required>${catOptions(s.category)}</select></div></div>
+    <div class="row"><div><label>Emirate · الإمارة</label><select name="emirate">${EMIRATES.map(e => `<option ${e===s.emirate?'selected':''}>${e}</option>`).join('')}</select></div>
+    <div><label>WhatsApp</label><input name="whatsapp" required maxlength="20" value="${esc(s.whatsapp || (USER.user_metadata||{}).phone)}"></div></div>
+    <div class="row"><div><label>Instagram (optional)</label><input name="instagram" maxlength="60" value="${esc(s.instagram)}" placeholder="@"></div>
+    <div><label>Business type · نوع النشاط</label><select name="entity">${['Home business permit','Freelance licence','Trade licence','Not licensed yet'].map(x => `<option ${x===s.entity?'selected':''}>${x}</option>`).join('')}</select></div></div>
+    <label>Licence / permit number (if any) · رقم الرخصة</label><input name="licence_no" maxlength="40" value="${esc(s.licence_no)}">
+    <label>About your shop · عن متجرك</label><textarea name="bio" rows="3" maxlength="500">${esc(s.bio)}</textarea>`;
+}
+function applyView() {
+  $('#app').innerHTML = `<h1>Open your shop <span class="ar">· افتحي متجرك</span></h1>
+  <p class="muted">Logged in as ${esc(USER.email)} · <a href="#" onclick="sb.auth.signOut();return false">log out</a></p>
+  <form class="card" id="sf" style="margin-top:14px">${shopForm()}
+    <label style="font-weight:normal"><input type="checkbox" required style="width:auto;margin:0 6px">
+    I confirm the business is at least 51% woman-owned and I accept the <a href="/terms.html" target="_blank">Conditions of Use</a> and <a href="/conduct.html" target="_blank">Seller Code of Conduct</a>.
+    <span class="ar">أؤكد إن المشروع مملوك لسيدة بنسبة 51% على الأقل وأوافق على الشروط وميثاق البائعات.</span></label><br>
+    <button class="btn">Submit for review · إرسال للمراجعة</button></form>`;
+  $('#sf').onsubmit = async e => {
+    e.preventDefault(); const f = Object.fromEntries(new FormData(e.target));
+    delete f[''];
+    f.id = USER.id;
+    f.slug = (f.shop_name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'shop') + '-' + USER.id.slice(0, 4);
+    const { error } = await sb.from('sellers').insert(f);
+    if (error) return toast(errMsg(error));
+    toast('Submitted · تم الإرسال'); boot();
+  };
+}
+
+/* ---------- DASHBOARD ---------- */
+function dash() {
+  const st = { pending: 'Your shop is under review. You can add products now — they go live once WARD approves your shop. · متجرك تحت المراجعة، تقدري تضيفي منتجاتك دلوقتي.',
+               suspended: 'Your shop is paused. Please contact WARD. · متجرك موقوف مؤقتاً، كلمينا.', approved: '' }[SELLER.status];
+  $('#app').innerHTML = `<h1>${esc(SELLER.shop_name)}</h1>
+  <p class="muted">${tag(SELLER.status)} · Plan: ${esc(SELLER.plan)} · ${esc(USER.email)} · <a href="/market/?shop=${encodeURIComponent(SELLER.slug)}" target="_blank">view my shop</a> · <a href="#" onclick="sb.auth.signOut();return false">log out</a></p>
+  ${st ? `<div class="note">${st}</div>` : ''}
+  <div class="tabs">${[['products','Products · المنتجات'],['orders','Orders · الطلبات'],['earnings','Earnings · أرباحي'],['shop','Shop details · بيانات المتجر']]
+    .map(([k, l]) => `<button class="${TAB===k?'on':''}" onclick="TAB='${k}';dash()">${l}</button>`).join('')}</div>
+  <div id="pane"><p class="muted">Loading…</p></div>`;
+  ({ products: productsPane, orders: ordersPane, earnings: earningsPane, shop: shopPane })[TAB]();
+}
+
+async function productsPane() {
+  const { data } = await sb.from('products').select('*').eq('seller_id', USER.id).order('created_at', { ascending: false });
+  PRODS = data || [];
+  $('#pane').innerHTML = `<button class="btn" onclick="editProd()">+ Add product · أضيفي منتج</button>
+  <div class="grid" style="margin-top:16px">${PRODS.map(p => `<div class="prod" onclick="editProd(${p.id})">
+    <div class="ph" style="background-image:url('${esc(imgUrl(p.images[0]))}')"></div>
+    <div class="in"><b>${esc(p.title)}</b><span class="price">${aed(p.price)}</span> · <span class="muted">stock ${p.stock}</span><br>${tag(p.status)}</div></div>`).join('')
+    || '<p class="muted">No products yet. · لسه مفيش منتجات.</p>'}</div>`;
+}
+
+let EDIT_IMGS = [];
+function editProd(id) {
+  const p = PRODS.find(x => x.id === id) || { title: '', description: '', price: '', category: SELLER.category, stock: 1, status: 'active', images: [] };
+  EDIT_IMGS = [...p.images];
+  $('#pmBody').innerHTML = `<h2 style="margin-top:0">${id ? 'Edit product · تعديل' : 'New product · منتج جديد'}</h2>
+  <form id="pf">
+    <label>Title · اسم المنتج</label><input name="title" required maxlength="90" value="${esc(p.title)}">
+    <div class="row"><div><label>Price (AED) · السعر</label><input name="price" type="number" step="0.01" min="1" required value="${p.price}"></div>
+    <div><label>Stock · الكمية المتاحة</label><input name="stock" type="number" min="0" required value="${p.stock}"></div></div>
+    <div class="row"><div><label>Category · الفئة</label><select name="category">${catOptions(p.category)}</select></div>
+    <div><label>Status · الحالة</label><select name="status"><option value="active" ${p.status==='active'?'selected':''}>Active · ظاهر</option><option value="draft" ${p.status==='draft'?'selected':''}>Draft · مخفي</option></select></div></div>
+    <div class="note" id="keep"></div>
+    <label>Description · الوصف</label><textarea name="description" rows="4" maxlength="2000">${esc(p.description)}</textarea>
+    <label>Photos (up to 4, max 5 MB each) · صور المنتج</label>
+    <div class="imgs" id="imgs"></div><input type="file" id="file" accept="image/jpeg,image/png,image/webp" multiple>
+    <button class="btn" id="saveBtn">Save · حفظ</button>
+    ${id ? `<button type="button" class="btn ghost" onclick="delProd(${id})">Delete · حذف</button>` : ''}
+  </form>`;
+  const keep = () => { const f = new FormData($('#pf')); const pr = parseFloat(f.get('price')) || 0;
+    const k = sellerKeeps(pr, f.get('category'), SELLER.plan);
+    $('#keep').innerHTML = pr ? `On a sale of ${aed(pr)}: WARD commission ${aed(k.comm)} → <b>you receive about ${aed(k.keep)}</b> (card payments also pass the card provider's fee at cost).<br><span class="ar">لو اتباع بـ ${pr} درهم: عمولة وَرد ${k.comm.toFixed(2)} ← هيوصلك تقريباً ${k.keep.toFixed(2)} درهم.</span>` : 'Enter a price to see what you receive. · اكتبي السعر عشان تشوفي هيوصلك كام.'; };
+  $('#pf').oninput = keep; keep(); drawImgs();
+  $('#file').onchange = async e => {
+    for (const file of [...e.target.files].slice(0, 4 - EDIT_IMGS.length)) {
+      if (file.size > 5242880) { toast('Photo too large (max 5 MB)'); continue; }
+      const path = `${USER.id}/${Date.now()}-${Math.random().toString(36).slice(2, 7)}.${(file.name.split('.').pop() || 'jpg').toLowerCase()}`;
+      const { error } = await sb.storage.from('product-images').upload(path, file, { contentType: file.type });
+      if (error) { toast(errMsg(error)); continue; }
+      EDIT_IMGS.push(path); drawImgs();
+    }
+    e.target.value = '';
+  };
+  $('#pf').onsubmit = async e => {
+    e.preventDefault(); const f = Object.fromEntries(new FormData(e.target));
+    const row = { title: f.title, description: f.description, price: +f.price, stock: +f.stock, category: f.category, status: f.status, images: EDIT_IMGS };
+    $('#saveBtn').disabled = true;
+    const { error } = id ? await sb.from('products').update(row).eq('id', id) : await sb.from('products').insert({ ...row, seller_id: USER.id });
+    if (error) { $('#saveBtn').disabled = false; return toast(errMsg(error)); }
+    $('#pm').classList.remove('open'); toast('Saved · تم الحفظ'); productsPane();
+  };
+  $('#pm').classList.add('open');
+}
+function drawImgs() { $('#imgs').innerHTML = EDIT_IMGS.map((p, i) => `<div style="background-image:url('${esc(imgUrl(p))}')"><button type="button" onclick="EDIT_IMGS.splice(${i},1);drawImgs()">×</button></div>`).join(''); }
+async function delProd(id) {
+  if (!confirm('Delete this product? · تحذفي المنتج؟')) return;
+  const { error } = await sb.from('products').delete().eq('id', id);
+  if (error) return toast(errMsg(error));
+  $('#pm').classList.remove('open'); productsPane();
+}
+
+async function ordersPane() {
+  const { data, error } = await sb.from('orders').select('*,order_items(*)').eq('seller_id', USER.id).order('created_at', { ascending: false });
+  if (error) return $('#pane').innerHTML = esc(error.message);
+  const next = { new: [['accepted','Accept · قبول'],['cancelled','Cancel · إلغاء']], accepted: [['shipped','Mark shipped · اتشحن']] };
+  $('#pane').innerHTML = (data || []).map(o => `<div class="card">
+    <div class="split"><b>Order ${esc(o.ref)}</b><span>${tag(o.status)} ${fmtDate(o.created_at)}</span></div>
+    ${o.order_items.map(i => `<div class="split"><span>${i.qty} × ${esc(i.title)}</span><span>${aed(i.price * i.qty)}</span></div>`).join('')}
+    <div class="split muted"><span>Buyer · العميلة</span><span>${esc(o.buyer_name)} · <a href="https://wa.me/${esc(o.buyer_phone.replace(/\D/g,''))}" target="_blank">${esc(o.buyer_phone)}</a></span></div>
+    <div class="muted">${esc(o.address)}, ${esc(o.emirate || '')}${o.notes ? ' — “' + esc(o.notes) + '”' : ''}</div>
+    <div class="split" style="margin-top:6px"><span>Payment</span><span>${esc(o.payment_method.toUpperCase())} · ${tag(o.payment_status)}</span></div>
+    <div class="split"><span>You receive · صافي ليكي</span><b class="price">${aed(o.seller_net)}</b></div>
+    <div style="margin-top:8px">${(next[o.status] || []).map(([s, l]) => `<button class="btn small ${s==='cancelled'?'ghost':''}" onclick="setStatus(${o.id},'${s}')">${l}</button>`).join(' ')}
+    ${o.status==='shipped' ? '<span class="muted">WARD marks it delivered once the buyer receives it. · وَرد بتأكد التسليم.</span>' : ''}</div></div>`).join('')
+    || '<p class="muted">No orders yet. · لسه مفيش طلبات.</p>';
+}
+async function setStatus(id, s) {
+  if (s === 'cancelled' && !confirm('Cancel this order? · تلغي الطلب؟')) return;
+  const { error } = await sb.rpc('set_order_status', { p_order: id, p_status: s });
+  if (error) return toast(errMsg(error)); ordersPane();
+}
+
+async function earningsPane() {
+  const { data } = await sb.from('orders').select('ref,status,seller_net,commission,items_total,delivered_at,payout_date,payout_status').eq('seller_id', USER.id).order('created_at', { ascending: false });
+  const o = data || [];
+  const sum = f => o.filter(f).reduce((a, x) => a + +x.seller_net, 0);
+  const paid = sum(x => x.payout_status === 'paid'), upcoming = sum(x => x.status === 'delivered' && x.payout_status === 'unpaid'),
+        open = sum(x => ['new','accepted','shipped'].includes(x.status)), comm = o.filter(x => x.status === 'delivered').reduce((a, x) => a + +x.commission, 0);
+  const byDate = {}; o.filter(x => x.status === 'delivered' && x.payout_status === 'unpaid').forEach(x => byDate[x.payout_date] = (byDate[x.payout_date] || 0) + +x.seller_net);
+  $('#pane').innerHTML = `<div class="kpis">
+    <div class="kpi">Paid to you · اتدفعلك<b>${aed(paid)}</b></div>
+    <div class="kpi">Scheduled payouts · مستحق<b>${aed(upcoming)}</b></div>
+    <div class="kpi">In open orders · طلبات جارية<b>${aed(open)}</b></div>
+    <div class="kpi">WARD commission on delivered · العمولة<b>${aed(comm)}</b></div></div>
+    <h2>Next payouts · مواعيد التحويل</h2>
+    ${Object.keys(byDate).sort().map(d => `<div class="split card" style="margin-bottom:8px"><span>${fmtDate(d)}</span><b>${aed(byDate[d])}</b></div>`).join('') || '<p class="muted">Nothing scheduled yet.</p>'}
+    <div class="note">Payouts run every 14 days for orders delivered at least 7 days earlier (see <a href="/terms.html" target="_blank">Conditions of Use</a>).<br>
+    <span class="ar">التحويل كل 14 يوم للطلبات اللي اتسلمت من 7 أيام أو أكتر.</span></div>`;
+}
+
+function shopPane() {
+  $('#pane').innerHTML = `<form class="card" id="sf">${shopForm(SELLER)}<button class="btn">Save · حفظ</button></form>`;
+  $('#sf').onsubmit = async e => {
+    e.preventDefault(); const f = Object.fromEntries(new FormData(e.target));
+    const { error } = await sb.from('sellers').update(f).eq('id', USER.id);
+    if (error) return toast(errMsg(error)); toast('Saved · تم الحفظ'); boot();
+  };
+}
+boot();
+</script>
+</body>
+</html>

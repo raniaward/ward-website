@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>WARD Admin</title>
+<meta name="robots" content="noindex,nofollow">
+<link rel="icon" href="/favicon.png"><link rel="stylesheet" href="market.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.min.js"></script>
+<script src="ward.js"></script>
+</head>
+<body>
+<main class="wrap" id="app"><p class="muted">Loading…</p></main>
+<script>
+header('');
+let TAB = 'sellers', USER = null;
+
+async function boot() {
+  await loadRates();
+  const { data: { session } } = await sb.auth.getSession();
+  USER = session && session.user;
+  if (!USER) { $('#app').innerHTML = `<div class="card" style="max-width:420px"><h2 style="margin-top:0">Admin log in</h2>
+    <form id="lf"><label>Email</label><input name="email" type="email" required><label>Password</label><input name="password" type="password" required>
+    <button class="btn">Log in</button></form><p class="muted" style="margin-top:10px">No account yet? Create one at <a href="/market/seller.html">Seller Centre</a> with rania@wardworld.org — it becomes admin automatically.</p></div>`;
+    $('#lf').onsubmit = async e => { e.preventDefault(); const f = new FormData(e.target);
+      const { error } = await sb.auth.signInWithPassword({ email: f.get('email'), password: f.get('password') });
+      if (error) return toast(errMsg(error)); boot(); };
+    return; }
+  const { data: ok } = await sb.rpc('is_admin');
+  if (!ok) { $('#app').innerHTML = `<p class="empty">This account is not an admin. · <a href="#" onclick="sb.auth.signOut().then(boot);return false">log out</a></p>`; return; }
+  draw();
+}
+
+function draw() {
+  $('#app').innerHTML = `<h1>WARD Admin</h1><p class="muted">${esc(USER.email)} · <a href="#" onclick="sb.auth.signOut().then(boot);return false">log out</a></p>
+  <div class="tabs">${[['sellers','Sellers · البائعات'],['orders','Orders · الطلبات'],['payouts','Payouts · التحويلات'],['money','WARD revenue · إيرادات وَرد'],['settings','Settings · الإعدادات']]
+    .map(([k, l]) => `<button class="${TAB===k?'on':''}" onclick="TAB='${k}';draw()">${l}</button>`).join('')}</div><div id="pane">Loading…</div>`;
+  ({ sellers, orders, payouts, money, settings })[TAB]();
+}
+
+async function sellers() {
+  const { data } = await sb.from('sellers').select('*,profiles(full_name,email,phone)').order('status').order('created_at', { ascending: false });
+  $('#pane').innerHTML = `<div style="overflow-x:auto"><table><tr><th>Shop</th><th>Owner</th><th>Category / Emirate</th><th>Licence</th><th>Plan</th><th>Status</th><th></th></tr>
+  ${(data || []).map(s => `<tr><td><b>${esc(s.shop_name)}</b><br><a href="/market/?shop=${encodeURIComponent(s.slug)}" target="_blank">view</a> ${s.instagram ? '· ' + esc(s.instagram) : ''}<br><span class="muted">${esc(s.bio || '').slice(0, 120)}</span></td>
+    <td>${esc(s.profiles?.full_name)}<br>${esc(s.profiles?.email)}<br><a href="https://wa.me/${esc((s.whatsapp || '').replace(/\D/g,''))}" target="_blank">${esc(s.whatsapp)}</a></td>
+    <td>${esc(catName(s.category))}<br>${esc(s.emirate)}</td><td>${esc(s.entity)}<br>${esc(s.licence_no)}</td>
+    <td><select onchange="upd('${s.id}',{plan:this.value})" style="margin:0">${['starter','growth','premium'].map(p => `<option ${p===s.plan?'selected':''}>${p}</option>`).join('')}</select></td>
+    <td>${tag(s.status)}<br><span class="muted">${fmtDate(s.created_at)}</span></td>
+    <td>${s.status !== 'approved' ? `<button class="btn small" onclick="upd('${s.id}',{status:'approved'})">Approve</button>` : ''}
+        ${s.status !== 'suspended' ? `<button class="btn small ghost" onclick="upd('${s.id}',{status:'suspended'})">Suspend</button>` : ''}</td></tr>`).join('')}
+  </table></div>${(data || []).length ? '' : '<p class="muted">No sellers yet.</p>'}`;
+}
+async function upd(id, row) { const { error } = await sb.from('sellers').update(row).eq('id', id); if (error) return toast(errMsg(error)); toast('Updated'); sellers(); }
+
+async function orders() {
+  const { data } = await sb.from('orders').select('*,order_items(*),sellers(shop_name)').order('created_at', { ascending: false }).limit(300);
+  $('#pane').innerHTML = `<div style="overflow-x:auto"><table><tr><th>Order</th><th>Shop</th><th>Buyer</th><th>Items</th><th>Paid by buyer</th><th>Commission</th><th>Seller gets</th><th>Status</th><th>Payment</th></tr>
+  ${(data || []).map(o => `<tr><td><b>${esc(o.ref)}</b><br><span class="muted">${fmtDate(o.created_at)}</span></td><td>${esc(o.sellers?.shop_name)}</td>
+    <td>${esc(o.buyer_name)}<br><a href="https://wa.me/${esc(o.buyer_phone.replace(/\D/g,''))}" target="_blank">${esc(o.buyer_phone)}</a><br><span class="muted">${esc(o.emirate || '')}</span></td>
+    <td>${o.order_items.map(i => `${i.qty}× ${esc(i.title)} (${i.rate}%)`).join('<br>')}</td>
+    <td>${aed(o.total_paid)}<br><span class="muted">${esc(o.payment_method)}</span></td><td>${aed(o.commission)}</td><td>${aed(o.seller_net)}</td>
+    <td><select style="margin:0" onchange="st(${o.id},this.value)">${['new','accepted','shipped','delivered','cancelled','refunded'].map(s => `<option ${s===o.status?'selected':''}>${s}</option>`).join('')}</select>
+      ${o.payout_date ? `<br><span class="muted">payout ${fmtDate(o.payout_date)}</span>` : ''}</td>
+    <td><select style="margin:0" onchange="pay(${o.id},this.value)">${['pending','paid','refunded'].map(s => `<option ${s===o.payment_status?'selected':''}>${s}</option>`).join('')}</select></td></tr>`).join('')}
+  </table></div>${(data || []).length ? '' : '<p class="muted">No orders yet.</p>'}`;
+}
+async function st(id, s) { const { error } = await sb.rpc('set_order_status', { p_order: id, p_status: s }); toast(error ? errMsg(error) : 'Status updated'); orders(); }
+async function pay(id, s) { const { error } = await sb.from('orders').update({ payment_status: s }).eq('id', id); toast(error ? errMsg(error) : 'Payment updated'); }
+
+async function payouts() {
+  const { data } = await sb.from('orders').select('id,ref,seller_id,seller_net,payout_date,payout_status,sellers(shop_name,whatsapp)').eq('status', 'delivered').eq('payout_status', 'unpaid').order('payout_date');
+  const g = {};
+  (data || []).forEach(o => { const k = o.payout_date + '|' + o.seller_id; (g[k] = g[k] || { date: o.payout_date, shop: o.sellers?.shop_name, wa: o.sellers?.whatsapp, ids: [], refs: [], sum: 0 }); g[k].ids.push(o.id); g[k].refs.push(o.ref); g[k].sum += +o.seller_net; });
+  const today = new Date().toISOString().slice(0, 10);
+  $('#pane').innerHTML = `<div class="note">Rule: every 14 days, pay sellers for orders delivered at least 7 days earlier. Mark a batch paid after the bank transfer is done.</div>
+  <div style="overflow-x:auto"><table><tr><th>Payout date</th><th>Shop</th><th>Orders</th><th>Amount</th><th></th></tr>
+  ${Object.values(g).map(x => `<tr><td>${fmtDate(x.date)} ${x.date <= today ? '<span class="tag new">due</span>' : ''}</td><td>${esc(x.shop)}<br><span class="muted">${esc(x.wa)}</span></td>
+    <td>${x.refs.map(esc).join(', ')}</td><td><b>${aed(x.sum)}</b></td>
+    <td><button class="btn small" onclick='markPaid(${JSON.stringify(x.ids)})'>Mark paid</button></td></tr>`).join('')}</table></div>
+  ${Object.keys(g).length ? '' : '<p class="muted">No payouts waiting.</p>'}`;
+}
+async function markPaid(ids) { if (!confirm('Mark these orders as paid out?')) return; const { error } = await sb.from('orders').update({ payout_status: 'paid' }).in('id', ids); toast(error ? errMsg(error) : 'Marked paid'); payouts(); }
+
+async function money() {
+  const { data } = await sb.from('orders').select('status,total_paid,commission,vat,handling_fee,gateway_delivery,ward_net,seller_net');
+  const o = data || [], d = o.filter(x => x.status === 'delivered'), s = (a, f) => a.reduce((t, x) => t + +x[f], 0);
+  $('#pane').innerHTML = `<div class="kpis">
+    <div class="kpi">Orders (all)<b>${o.length}</b></div>
+    <div class="kpi">Sales delivered (GMV)<b>${aed(s(d,'total_paid'))}</b></div>
+    <div class="kpi">WARD commission (delivered)<b>${aed(s(d,'commission'))}</b></div>
+    <div class="kpi">WARD net (delivered)<b>${aed(s(d,'ward_net'))}</b></div>
+    <div class="kpi">Owed / paid to sellers<b>${aed(s(d,'seller_net'))}</b></div>
+    <div class="kpi">Open orders value<b>${aed(s(o.filter(x => ['new','accepted','shipped'].includes(x.status)),'total_paid'))}</b></div></div>`;
+}
+
+async function settings() {
+  const { data: s } = await sb.from('ward_settings').select('*').single();
+  $('#pane').innerHTML = `<form class="card" id="setf" style="max-width:560px">
+    <div class="row"><div><label>Delivery fee per shop (AED)</label><input name="delivery_fee" type="number" step="0.01" value="${s.delivery_fee}"></div>
+    <div><label>Cash-on-delivery fee (AED)</label><input name="cod_fee" type="number" step="0.01" value="${s.cod_fee}"></div></div>
+    <div class="row"><div><label>Card provider fee % (pass-through)</label><input name="gateway_pct" type="number" step="0.01" value="${s.gateway_pct}"></div>
+    <div><label>Bank transfer fee (AED)</label><input name="bank_fee" type="number" step="0.01" value="${s.bank_fee}"></div></div>
+    <div class="row"><div><label>First payout date (a Monday)</label><input name="payout_anchor" type="date" value="${s.payout_anchor}"></div>
+    <div><label>5% VAT on commission</label><select name="vat_on_commission"><option value="false" ${!s.vat_on_commission?'selected':''}>Off (not VAT-registered)</option><option value="true" ${s.vat_on_commission?'selected':''}>On</option></select></div></div>
+    <button class="btn">Save settings</button></form>
+    <h2>Commission rates</h2><table><tr><th>Category</th><th>Rate %</th></tr>${RATES.map(r => `<tr><td>${esc(r.name_en)} · ${esc(r.name_ar)}</td><td><input type="number" step="0.5" value="${r.rate}" style="margin:0;max-width:90px" onchange="rate('${r.key}',this.value)"></td></tr>`).join('')}</table>
+    <p class="muted" style="margin-top:8px">Changes apply to new orders only.</p>`;
+  $('#setf').onsubmit = async e => { e.preventDefault(); const f = Object.fromEntries(new FormData(e.target)); f.vat_on_commission = f.vat_on_commission === 'true';
+    const { error } = await sb.from('ward_settings').update(f).eq('id', 1); toast(error ? errMsg(error) : 'Saved'); };
+}
+async function rate(k, v) { const { error } = await sb.from('commission_rates').update({ rate: +v }).eq('key', k); toast(error ? errMsg(error) : 'Rate saved'); RATES = []; await loadRates(); }
+boot();
+</script>
+</body>
+</html>
