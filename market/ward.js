@@ -58,6 +58,7 @@ function header(active) {
   h.innerHTML = `<a href="/"><img src="/logo.png" alt="WARD"></a>
   <nav>
     <a href="/market/" class="${active==='shop'?'on':''}">Shop · تسوّقي</a>
+    <a href="/market/services.html" class="${active==='services'?'on':''}">Services · خدمات</a>
     <a href="/market/order.html" class="${active==='order'?'on':''}">My order · طلبي</a>
     <a href="/market/seller.html" class="${active==='seller'?'on':''}">Sell on WARD · بيعي معنا</a>
     <a href="/market/cart.html" class="cartlink">Cart · السلة (<span id="cartCount">0</span>)</a>
@@ -79,7 +80,7 @@ function header(active) {
       <button class="btn small ghost" onclick="logout()">Log out · خروج</button>`;
   });
   const f = document.createElement('footer'); f.className = 'mk';
-  f.innerHTML = `© 2026 WARD LLC · Sharjah Media City (Shams) · <a href="/terms.html">Terms</a> · <a href="/privacy.html">Privacy</a> · <a href="/conduct.html">Seller code</a>`;
+  f.innerHTML = `© 2026 WARD LLC · Sharjah Media City (Shams) · <a href="/terms.html">Terms</a> · <a href="/privacy.html">Privacy</a> · <a href="/conduct.html">Seller code</a> · <a href="/market/data-request.html">Your data · بياناتك</a>`;
   document.body.appendChild(f);
   Cart.badge();
 }
@@ -101,3 +102,21 @@ function reviewList(rows) {
 }
 
 function tag(s) { return `<span class="tag ${esc(s)}">${esc(s)}</span>`; }
+
+// Accessibility: connect each <label> to the field right after it, and name icon-only buttons
+let _lblN = 0;
+function linkLabels(root = document) {
+  root.querySelectorAll('label:not([for])').forEach(l => {
+    if (l.querySelector('input,select,textarea')) return;
+    let el = l.nextElementSibling;
+    while (el && !/^(INPUT|SELECT|TEXTAREA)$/.test(el.tagName) && !el.querySelector?.('input,select,textarea')) el = el.nextElementSibling;
+    if (el && !/^(INPUT|SELECT|TEXTAREA)$/.test(el.tagName)) el = el.querySelector('input,select,textarea');
+    if (!el) return;
+    if (!el.id) el.id = 'f' + (++_lblN);
+    l.htmlFor = el.id;
+  });
+  root.querySelectorAll('button.x:not([aria-label])').forEach(b => b.setAttribute('aria-label', 'Close · إغلاق'));
+  root.querySelectorAll('input[placeholder]:not([aria-label]):not([id])').forEach(i => { if (!i.labels || !i.labels.length) i.setAttribute('aria-label', i.placeholder); });
+}
+try { new MutationObserver(() => linkLabels()).observe(document.documentElement, { childList: true, subtree: true }); } catch {}
+document.addEventListener('DOMContentLoaded', () => linkLabels());

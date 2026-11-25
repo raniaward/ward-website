@@ -4,9 +4,9 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>WARD Admin</title>
 <meta name="robots" content="noindex,nofollow">
-<link rel="icon" href="/favicon.png"><link rel="stylesheet" href="market.css?v=12">
+<link rel="icon" href="/favicon.png"><link rel="stylesheet" href="market.css?v=13">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.min.js"></script>
-<script src="ward.js?v=12"></script>
+<script src="ward.js?v=13"></script>
 </head>
 <body>
 <main class="wrap" id="app"><p class="muted">Loading…</p></main>
@@ -27,14 +27,19 @@ async function boot() {
     return; }
   const { data: ok } = await sb.rpc('is_admin');
   if (!ok) { $('#app').innerHTML = `<p class="empty">This account is not an admin. · <a href="#" onclick="sb.auth.signOut().then(boot);return false">log out</a></p>`; return; }
+  // two-step login: if a code app is set up, ask for the 6-digit code
+  try {
+    const { data: lvl } = await sb.auth.mfa.getAuthenticatorAssuranceLevel();
+    if (lvl && lvl.nextLevel === 'aal2' && lvl.currentLevel !== 'aal2') return mfaPrompt();
+  } catch {}
   draw();
 }
 
 function draw() {
-  $('#app').innerHTML = `<h1>WARD Admin</h1><p class="muted">${esc(USER.email)} · <a href="#" onclick="sb.auth.signOut().then(boot);return false">log out</a></p>
-  <div class="tabs">${[['founding','Founding 100 · المؤسِّسات'],['cases','Cases · الشكاوى'],['enquiries','Enquiries · الاستفسارات'],['data','Data requests · طلبات البيانات'],['sellers','Sellers · البائعات'],['orders','Orders · الطلبات'],['payouts','Payouts · التحويلات'],['reviews','Reviews · التقييمات'],['vouchers','Vouchers · القسائم'],['money','WARD revenue · إيرادات وَرد'],['settings','Settings · الإعدادات']]
+  $('#app').innerHTML = `<h1>WARD Admin</h1><p class="muted">${esc(USER.email)} · <a href="#" onclick="mfaSetup();return false">🔐 Two-step login · الدخول بخطوتين</a> · <a href="#" onclick="sb.auth.signOut().then(boot);return false">log out</a></p>
+  <div class="tabs">${[['founding','Founding 100 · المؤسِّسات'],['cases','Cases · الشكاوى'],['enquiries','Enquiries · الاستفسارات'],['data','Data requests · طلبات البيانات'],['sellers','Sellers · البائعات'],['orders','Orders · الطلبات'],['payouts','Payouts · التحويلات'],['reviews','Reviews · التقييمات'],['vouchers','Vouchers · القسائم'],['sponsors','Sponsors · الرعاة'],['money','WARD revenue · إيرادات وَرد'],['settings','Settings · الإعدادات']]
     .map(([k, l]) => `<button class="${TAB===k?'on':''}" onclick="TAB='${k}';draw()">${l}</button>`).join('')}</div><div id="pane">Loading…</div>`;
-  ({ founding, cases, enquiries, data: dataReq, sellers, orders, payouts, reviews, vouchers, money, settings })[TAB]();
+  ({ founding, cases, enquiries, data: dataReq, sellers, orders, payouts, reviews, vouchers, sponsors, money, settings })[TAB]();
 }
 
 async function sellers() {
@@ -188,6 +193,80 @@ async function dataReq() {
   </table></div>${(data || []).length ? '' : '<p class="muted">No requests.</p>'}`;
 }
 async function dUpd(id, row) { const { error } = await sb.from('data_requests').update(row).eq('id', id); toast(error ? errMsg(error) : 'Saved'); dataReq(); }
+
+async function mfaPrompt() {
+  const { data } = await sb.auth.mfa.listFactors();
+  const f = (data && data.totp || []).find(x => x.status === 'verified');
+  if (!f) return draw();
+  $('#app').innerHTML = `<div class="card" style="max-width:420px"><h2 style="margin-top:0">Enter your code · أدخلي الكود</h2>
+    <p class="muted">Open your authenticator app and type the 6-digit code for WARD.</p>
+    <form id="mf"><input name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" required aria-label="6-digit code"><button class="btn">Continue · متابعة</button></form>
+    <p style="margin-top:10px"><a href="#" onclick="sb.auth.signOut().then(boot);return false">log out</a></p></div>`;
+  $('#mf').onsubmit = async e => { e.preventDefault();
+    const { error } = await sb.auth.mfa.challengeAndVerify({ factorId: f.id, code: new FormData(e.target).get('code').trim() });
+    if (error) return toast(errMsg(error)); draw(); };
+}
+async function mfaSetup() {
+  const { data: list } = await sb.auth.mfa.listFactors();
+  const have = (list && list.totp || []).filter(x => x.status === 'verified');
+  if (have.length) {
+    $('#pane').innerHTML = `<div class="card" style="max-width:520px"><h2 style="margin-top:0">Two-step login is ON ✅</h2>
+      <p>Each time you log in, the admin page asks for the 6-digit code from your authenticator app.</p>
+      <button class="btn ghost" onclick="mfaOff('${have[0].id}')">Turn it off · إيقاف</button></div>`; return; }
+  const { data, error } = await sb.auth.mfa.enroll({ factorType: 'totp', friendlyName: 'WARD admin ' + Date.now() });
+  if (error) return toast(errMsg(error));
+  $('#pane').innerHTML = `<div class="card" style="max-width:520px"><h2 style="margin-top:0">Turn on two-step login · الدخول بخطوتين</h2>
+    <p>1. Install Google Authenticator or Microsoft Authenticator on your phone.<br>2. In the app, tap + and scan this code.<br>3. Type the 6-digit code the app shows.</p>
+    <p class="ar">نزّلي Google Authenticator، دوسي + وامسحي الكود، واكتبي الـ6 أرقام.</p>
+    <img src="${data.totp.qr_code}" alt="QR code for the authenticator app" style="width:200px;height:200px;background:#fff">
+    <p class="muted">Can't scan? Enter this key: <code>${esc(data.totp.secret)}</code></p>
+    <form id="ve"><input name="code" inputmode="numeric" maxlength="6" required aria-label="6-digit code"><button class="btn">Verify &amp; turn on · تفعيل</button></form></div>`;
+  $('#ve').onsubmit = async e => { e.preventDefault();
+    const { error } = await sb.auth.mfa.challengeAndVerify({ factorId: data.id, code: new FormData(e.target).get('code').trim() });
+    if (error) return toast(errMsg(error)); toast('Two-step login is on ✅'); mfaSetup(); };
+}
+async function mfaOff(id) { if (!confirm('Turn off two-step login?')) return; const { error } = await sb.auth.mfa.unenroll({ factorId: id }); toast(error ? errMsg(error) : 'Turned off'); mfaSetup(); }
+
+async function sponsors() {
+  const [{ data: sp }, { data: pr }, { data: al }, { data: sl }] = await Promise.all([
+    sb.from('sponsors').select('*').order('created_at', { ascending: false }),
+    sb.from('sponsor_programmes').select('*').order('created_at', { ascending: false }),
+    sb.from('sponsor_allocations').select('*,sellers(shop_name)').order('created_at', { ascending: false }),
+    sb.from('sellers').select('id,shop_name').eq('status', 'approved').order('shop_name')]);
+  const S = sp || [], P = pr || [], A = al || [];
+  const used = id => A.filter(a => a.programme_id === id && a.status !== 'cancelled').reduce((t, a) => t + +a.amount, 0);
+  $('#pane').innerHTML = `<div class="note">Sponsor-funded <b>Growth Vouchers · قسائم النمو</b>: a sponsor funds a programme, WARD allocates support to selected shops. Records only. Nothing here is shown publicly, and a programme can allocate only when it is <b>active</b> with a <b>signed sponsor agreement</b>; it can never go over budget.</div>
+  <h2>Sponsors · الرعاة</h2>
+  <form class="card" id="spf"><div class="row"><div><label>Sponsor name</label><input name="name" required></div><div><label>Contact person</label><input name="contact_name"></div></div>
+    <div class="row"><div><label>Email</label><input name="email" type="email"></div><div><label>Phone</label><input name="phone"></div></div><button class="btn small">+ Add sponsor</button></form>
+  <div style="overflow-x:auto"><table><tr><th>Sponsor</th><th>Contact</th><th>Status</th><th>Notes</th></tr>
+  ${S.map(x => `<tr><td><b>${esc(x.name)}</b></td><td>${esc(x.contact_name || '')}<br>${esc(x.email || '')} ${esc(x.phone || '')}</td>
+    <td><select style="margin:0" onchange="spUpd('sponsors',${x.id},{status:this.value})">${['prospect','in_talks','agreed','active','ended'].map(k => `<option ${k === x.status ? 'selected' : ''}>${k}</option>`).join('')}</select></td>
+    <td><textarea rows="2" style="margin:0" onchange="spUpd('sponsors',${x.id},{notes:this.value})">${esc(x.notes || '')}</textarea></td></tr>`).join('')}</table></div>
+  <h2>Programmes · البرامج</h2>
+  ${S.length ? `<form class="card" id="prf"><div class="row"><div><label>Sponsor</label><select name="sponsor_id">${S.map(x => `<option value="${x.id}">${esc(x.name)}</option>`).join('')}</select></div><div><label>Programme title</label><input name="title" required></div></div>
+    <div class="row"><div><label>Total budget (AED)</label><input name="budget" type="number" min="0" step="0.01" required></div><div><label>Value per shop (AED, optional)</label><input name="value_per_seller" type="number" min="1" step="0.01"></div></div>
+    <label>Who qualifies (criteria)</label><textarea name="criteria" rows="2"></textarea>
+    <div class="row"><div><label>Starts</label><input name="starts_on" type="date"></div><div><label>Ends</label><input name="ends_on" type="date"></div></div><button class="btn small">+ Add programme</button></form>` : '<p class="muted">Add a sponsor first.</p>'}
+  ${P.map(p => { const u = used(p.id), sname = (S.find(x => x.id === p.sponsor_id) || {}).name;
+    return `<div class="card"><div class="split"><b>${esc(p.title)}</b><span>${esc(sname || '')}</span></div>
+    <div class="kpis"><div class="kpi">Budget<b>${aed(p.budget)}</b></div><div class="kpi">Allocated<b>${aed(u)}</b></div><div class="kpi">Remaining<b>${aed(+p.budget - u)}</b></div></div>
+    <p class="muted">${esc(p.criteria || '')} ${p.starts_on ? '· ' + fmtDate(p.starts_on) + ' → ' + fmtDate(p.ends_on) : ''}</p>
+    <label style="font-weight:normal"><input type="checkbox" style="width:auto" ${p.agreement_signed ? 'checked' : ''} onchange="spUpd('sponsor_programmes',${p.id},{agreement_signed:this.checked})"> Sponsor agreement signed · العقد اتمضى</label>
+    <select style="max-width:200px" onchange="spUpd('sponsor_programmes',${p.id},{status:this.value})">${['draft','active','closed'].map(k => `<option ${k === p.status ? 'selected' : ''}>${k}</option>`).join('')}</select>
+    <form class="row" onsubmit="alloc(event,${p.id})" style="align-items:end"><div><label>Shop</label><select name="seller_id">${(sl || []).map(x => `<option value="${x.id}">${esc(x.shop_name)}</option>`).join('')}</select></div>
+      <div><label>Amount (AED)</label><input name="amount" type="number" min="1" step="0.01" value="${p.value_per_seller || ''}" required></div><button class="btn small">Allocate</button></form>
+    <table><tr><th>Shop</th><th>Amount</th><th>Status</th><th>Paid / ref</th></tr>${A.filter(a => a.programme_id === p.id).map(a => `<tr><td>${esc(a.sellers?.shop_name)}</td><td>${aed(a.amount)}</td>
+      <td><select style="margin:0" onchange="spUpd('sponsor_allocations',${a.id},{status:this.value})">${['allocated','paid','cancelled'].map(k => `<option ${k === a.status ? 'selected' : ''}>${k}</option>`).join('')}</select></td>
+      <td>${a.paid_at ? fmtDate(a.paid_at) : ''}<input style="margin:0" placeholder="transfer ref" value="${esc(a.reference || '')}" onchange="spUpd('sponsor_allocations',${a.id},{reference:this.value})"></td></tr>`).join('')}</table></div>`; }).join('')}`;
+  $('#spf').onsubmit = async e => { e.preventDefault(); const f = Object.fromEntries(new FormData(e.target)); const { error } = await sb.from('sponsors').insert(f); toast(error ? errMsg(error) : 'Added'); sponsors(); };
+  if ($('#prf')) $('#prf').onsubmit = async e => { e.preventDefault(); const f = Object.fromEntries(new FormData(e.target));
+    ['value_per_seller','starts_on','ends_on'].forEach(k => { if (!f[k]) f[k] = null; });
+    const { error } = await sb.from('sponsor_programmes').insert(f); toast(error ? errMsg(error) : 'Added'); sponsors(); };
+}
+async function spUpd(t, id, row) { const { error } = await sb.from(t).update(row).eq('id', id); toast(error ? errMsg(error) : 'Saved'); sponsors(); }
+async function alloc(e, pid) { e.preventDefault(); const f = Object.fromEntries(new FormData(e.target)); f.programme_id = pid;
+  const { error } = await sb.from('sponsor_allocations').insert(f); toast(error ? errMsg(error) : 'Allocated'); sponsors(); }
 boot();
 </script>
 </body>

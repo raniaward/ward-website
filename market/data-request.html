@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Your data · بياناتك — WARD</title>
+<meta name="robots" content="noindex">
+<link rel="icon" href="/favicon.png"><link rel="stylesheet" href="market.css?v=13">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.min.js"></script>
+<script src="ward.js?v=13"></script>
+</head>
+<body>
+<main class="wrap" style="max-width:680px">
+  <h1>Your data <span class="ar">· بياناتك</span></h1>
+  <p class="muted">Ask WARD to delete your data, send you a copy, or correct it. We confirm it's you (from the same email or WhatsApp) and reply within 30 days. Some order records must be kept for tax and accounting law. See our <a href="/privacy.html">Privacy Notice</a>.<br>
+  <span class="ar">اطلبي من ورد مسح بياناتك أو نسخة منها أو تصحيحها. هنتأكد إنك إنتي ونرد خلال 30 يوم. بعض سجلات الطلبات لازم تتحفظ بحكم القانون.</span></p>
+  <form class="card" id="df" style="margin-top:14px">
+    <label>What do you need? · محتاجة إيه؟</label>
+    <select name="type"><option value="delete">Delete my data / account · امسحي بياناتي</option><option value="copy">Send me a copy · ابعتولي نسخة</option><option value="correct">Correct my data · صحّحوا بياناتي</option></select>
+    <label>Name · الاسم</label><input name="name" maxlength="100">
+    <div class="row"><div><label>Email · الإيميل</label><input name="email" type="email" maxlength="120"></div>
+    <div><label>Mobile · الموبايل</label><input name="phone" maxlength="30" placeholder="+971…"></div></div>
+    <label>Details (account email, order numbers, what to correct) · تفاصيل</label><textarea name="details" rows="3" maxlength="1500"></textarea>
+    <button class="btn">Send request · إرسال الطلب</button>
+  </form>
+  <div id="done"></div>
+</main>
+<script>
+header('');
+sb.auth.getSession().then(({ data: { session } }) => { if (session) $('input[name=email]').value = session.user.email; });
+$('#df').onsubmit = async e => {
+  e.preventDefault(); const f = new FormData(e.target);
+  const { data, error } = await sb.rpc('submit_data_request', { p_type: f.get('type'), p_name: f.get('name'), p_email: f.get('email'), p_phone: f.get('phone'), p_details: f.get('details') });
+  if (error) return toast(errMsg(error));
+  try { fetch('https://api.web3forms.com/submit', { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ access_key: 'f21e0196-4584-4e59-af8e-26524f373dee', subject: 'WARD data request ' + data + ' (' + f.get('type') + ')', from_name: 'WARD website', request: data, email: f.get('email'), phone: f.get('phone') }) }).catch(() => {}); } catch {}
+  $('#df').style.display = 'none';
+  $('#done').innerHTML = `<div class="card"><h2 style="margin-top:0">Request received · وصلنا طلبك</h2><p>Your reference is <b>${esc(data)}</b>. We'll contact you to confirm it's you, then reply within 30 days.</p></div>`;
+};
+</script>
+</body>
+</html>
