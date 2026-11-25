@@ -4,9 +4,9 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>WARD Shop · سوق وَرد</title>
 <meta name="description" content="Shop products and Growth Vouchers from women-owned businesses across the UAE.">
-<link rel="icon" href="/favicon.png"><link rel="stylesheet" href="market.css">
+<link rel="icon" href="/favicon.png"><link rel="stylesheet" href="market.css?v=10">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.min.js"></script>
-<script src="ward.js"></script>
+<script src="ward.js?v=10"></script>
 </head>
 <body>
 <main class="wrap">
@@ -16,6 +16,7 @@
   </div>
   <input id="q" placeholder="Search · ابحثي عن منتج" style="max-width:420px;margin-top:14px">
   <div class="chips" id="chips"></div>
+  <div id="shops"></div>
   <div class="grid" id="grid"><p class="muted">Loading…</p></div>
   <div id="shopReviews"></div>
 </main>
@@ -24,7 +25,7 @@
 
 <script>
 header('shop');
-let ALL = [], CAT = '', PR = {}, SR = {}, SELLER = new URLSearchParams(location.search).get('shop');
+let ALL = [], SHOPS = [], CAT = '', PR = {}, SR = {}, SELLER = new URLSearchParams(location.search).get('shop');
 
 async function init() {
   await loadRates();
@@ -36,7 +37,9 @@ async function init() {
   let q = sb.from('products').select('id,title,description,price,voucher_value,category,stock,images,kind,seller_id,sellers!inner(shop_name,slug,emirate,status)')
     .eq('status', 'active').eq('sellers.status', 'approved').order('created_at', { ascending: false }).limit(300);
   if (SELLER) q = q.eq('sellers.slug', SELLER);
-  const [{ data, error }, pr, sr] = await Promise.all([q, sb.from('product_ratings').select('*'), sb.from('seller_ratings').select('*')]);
+  const [{ data, error }, pr, sr, sh] = await Promise.all([q, sb.from('product_ratings').select('*'), sb.from('seller_ratings').select('*'),
+    sb.from('sellers').select('id,shop_name,slug,category,emirate,logo_url').eq('status', 'approved').order('shop_name')]);
+  SHOPS = sh.data || [];
   if (error) { $('#grid').innerHTML = `<p class="empty">Could not load products: ${esc(error.message)}</p>`; return; }
   (pr.data || []).forEach(r => PR[r.product_id] = r);
   (sr.data || []).forEach(r => SR[r.seller_id] = r);
@@ -61,7 +64,19 @@ async function shopHeader() {
   $('#shopReviews').innerHTML = `<h2>Reviews · التقييمات</h2><div class="card">${reviewList(rv)}</div>`;
 }
 
+function renderShops() {
+  if (SELLER || CAT === 'voucher') { $('#shops').innerHTML = ''; return; }
+  const ids = new Set(ALL.filter(p => p.kind !== 'voucher' && (!CAT || p.category === CAT)).map(p => p.seller_id));
+  const list = SHOPS.filter(s => ids.has(s.id) || (CAT && s.category === CAT));
+  if (!list.length) { $('#shops').innerHTML = ''; return; }
+  $('#shops').innerHTML = `<h2 style="margin-top:4px">Shops · المتاجر <span class="muted" style="font-size:14px">(${list.length})</span></h2>
+    <div class="shoprow">${list.map(s => { const r = SR[s.id] || {}; return `<a class="shopcard" href="?shop=${encodeURIComponent(s.slug)}">
+      <div class="lg" style="background-image:url('${esc(imgUrl(s.logo_url))}')"></div>
+      <b>${esc(s.shop_name)}</b><span class="muted">${esc(s.emirate || '')}</span>${stars(r.avg_rating, r.review_count)}</a>`; }).join('')}</div>
+    <h2>Products · المنتجات</h2>`;
+}
 function render() {
+  renderShops();
   const t = $('#q').value.trim().toLowerCase();
   const list = ALL.filter(p => ((!CAT && (SELLER || p.kind !== 'voucher')) || (CAT && (CAT === 'voucher' ? p.kind === 'voucher' : p.category === CAT && p.kind !== 'voucher')))
     && (!t || (p.title + ' ' + (p.description || '') + ' ' + p.sellers.shop_name).toLowerCase().includes(t)));
