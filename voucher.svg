@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 600">
+  <rect width="600" height="600" fill="#e6ead9"/>
+  <rect x="60" y="150" width="480" height="300" rx="28" fill="#85000f"/>
+  <circle cx="60" cy="300" r="34" fill="#e6ead9"/>
+  <circle cx="540" cy="300" r="34" fill="#e6ead9"/>
+  <line x1="390" y1="180" x2="390" y2="420" stroke="#e6ead9" stroke-width="4" stroke-dasharray="10 10"/>
+  <g transform="translate(465 300)">
+    <path d="M0 -58 C-22 -40 -30 -14 -20 8 C-12 24 0 30 0 30 C0 30 12 24 20 8 C30 -14 22 -40 0 -58Z" fill="#c0313f"/>
+    <path d="M0 30 L0 70 M0 50 C-16 40 -30 42 -40 52 M0 50 C16 40 30 42 40 52" stroke="#93a376" stroke-width="7" fill="none" stroke-linecap="round"/>
+  </g>
+  <text x="110" y="250" font-family="Georgia,serif" font-size="44" fill="#ffffff" font-weight="bold">WARD</text>
+  <text x="110" y="305" font-family="Arial,sans-serif" font-size="34" fill="#ffffff">Growth Voucher</text>
+  <text x="110" y="355" font-family="Tahoma,Arial,sans-serif" font-size="32" fill="#f6f4ec">قسيمة نمو</text>
+  <text x="110" y="405" font-family="Arial,sans-serif" font-size="20" fill="#e6ead9">Spend at this shop · تُصرف في هذا المتجر</text>
+</svg>
