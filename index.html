@@ -648,5 +648,20 @@ function loadTranslate(b){b.style.display='none';var s=document.createElement('s
 document.querySelectorAll('form input[placeholder],form textarea[placeholder]').forEach(function(f,i){if(f.type==='hidden')return;var id='f'+i;f.id=id;var l=document.createElement('label');l.htmlFor=id;l.textContent=f.placeholder.replace(/ \/ .*/,'')+(f.required?' *':'');var a=document.createElement('span');a.className='ar';a.textContent=' · '+(f.placeholder.split(' / ')[1]||'');l.appendChild(a);f.parentNode.insertBefore(l,f);});
 </script>
 <script>document.querySelectorAll("nav a").forEach(a=>a.addEventListener("click",()=>document.querySelector("header").classList.remove("open")));</script>
+<script>
+// Founding 100: save each application in the WARD database (admin list) as well as the email
+(function(){var f=document.forms.first100;if(!f)return;f.addEventListener('submit',function(e){
+ if(f.dataset.saved)return; e.preventDefault();
+ var d={};['name','business','whatsapp','email','social','entity','licence','category','emirate'].forEach(function(k){d[k]=(f[k]&&f[k].value)||''});
+ d.accept_terms=!!(f.accept_terms&&f.accept_terms.checked); d.marketing=!!(f.marketing&&f.marketing.checked);
+ var b=f.querySelector('button[type=submit],button:not([type])'); if(b){b.disabled=true;}
+ fetch('https://ungagrjhdahwgrhsinwi.supabase.co/rest/v1/rpc/submit_founding',{method:'POST',headers:{'Content-Type':'application/json',apikey:'sb_publishable_yP37gVP-FrT3o-xITXMOlg_ZLFHJRfL',Authorization:'Bearer sb_publishable_yP37gVP-FrT3o-xITXMOlg_ZLFHJRfL'},body:JSON.stringify({p:d})})
+ .then(function(r){return r.json().then(function(j){return {ok:r.ok,j:j}})}).then(function(x){
+   if(!x.ok){alert((x.j&&x.j.message)||'Please check the form');if(b)b.disabled=false;return;}
+   var h=document.createElement('input');h.type='hidden';h.name='application_ref';h.value=x.j;f.appendChild(h);
+   f.dataset.saved=1; f.submit();
+ }).catch(function(){f.dataset.saved=1;f.submit();});
+});})();
+</script>
 </body>
 </html>
