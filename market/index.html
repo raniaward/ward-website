@@ -4,9 +4,9 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>WARD Shop · سوق وَرد</title>
 <meta name="description" content="Shop products and Advance Purchase Vouchers from women-owned businesses across the UAE.">
-<link rel="canonical" href="https://wardworld.org/market/"><link rel="icon" href="/favicon.png"><link rel="stylesheet" href="market.css?v=11">
+<link rel="canonical" href="https://wardworld.org/market/"><link rel="icon" href="/favicon.png"><link rel="stylesheet" href="market.css?v=12">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.min.js"></script>
-<script src="ward.js?v=11"></script>
+<script src="ward.js?v=12"></script>
 </head>
 <body>
 <main class="wrap">
@@ -34,7 +34,7 @@ async function init() {
     RATES.map(r => `<button class="chip" data-c="${r.key}">${esc(r.name_en)} · ${esc(r.name_ar)}</button>`).join('');
   $$('#chips .chip').forEach(b => b.onclick = () => { CAT = b.dataset.c; $$('#chips .chip').forEach(x => x.classList.toggle('on', x === b)); render(); });
 
-  let q = sb.from('products').select('id,title,description,price,voucher_value,category,stock,images,kind,seller_id,sellers!inner(shop_name,slug,emirate,status)')
+  let q = sb.from('products').select('id,title,description,price,voucher_value,category,stock,images,kind,seller_id,sellers!inner(shop_name,slug,emirate,status,paused_until,pause_message,lead_time_days)')
     .eq('status', 'active').eq('sellers.status', 'approved').order('created_at', { ascending: false }).limit(300);
   if (SELLER) q = q.eq('sellers.slug', SELLER);
   const [{ data, error }, pr, sr, sh] = await Promise.all([q, sb.from('product_ratings').select('*'), sb.from('seller_ratings').select('*'),
@@ -49,7 +49,7 @@ async function init() {
 }
 
 async function shopHeader() {
-  const { data: s } = await sb.from('sellers').select('id,shop_name,slug,bio,emirate,instagram,logo_url,cover_url,category').eq('slug', SELLER).maybeSingle();
+  const { data: s } = await sb.from('sellers').select('id,shop_name,slug,bio,emirate,instagram,logo_url,cover_url,category,paused_until,pause_message,lead_time_days').eq('slug', SELLER).maybeSingle();
   if (!s) return;
   const r = SR[s.id] || {};
   $('#shopHead').innerHTML = `<div class="cover" ${s.cover_url ? `style="background-image:url('${esc(imgUrl(s.cover_url))}')"` : ''}></div>
@@ -59,6 +59,9 @@ async function shopHeader() {
     ${s.instagram ? ` · <a href="https://instagram.com/${encodeURIComponent(s.instagram.replace('@',''))}" target="_blank">${esc(s.instagram)}</a>` : ''}</div></div></div>
     ${s.bio ? `<p style="margin:12px 0;white-space:pre-line">${esc(s.bio)}</p>` : ''}
     ${ALL.some(x => x.kind === 'voucher') ? `<p><button class="btn" onclick="giftFrom('${s.id}')">🌱 Grow with this shop — Advance Purchase Voucher · انمي مع المتجر — قسيمة شراء مسبق</button></p>` : ''}
+    ${isPaused(s) ? `<div class="note" style="background:#fff3cd">⏸ This shop is on a break until <b>${fmtDate(s.paused_until)}</b> and isn't taking orders. · المتجر في إجازة لحد ${fmtDate(s.paused_until)}.${s.pause_message ? '<br>' + esc(s.pause_message) : ''}</div>` : ''}
+    ${s.lead_time_days ? `<p class="muted">⏱ Orders are ready in about ${s.lead_time_days} day(s). · الطلب بيجهز في حوالي ${s.lead_time_days} يوم.</p>` : ''}
+    <p><button class="btn ghost" onclick="askShop('${s.id}', '${esc(s.shop_name).replace(/'/g, '')}')">💬 Ask the shop · اسألي المتجر</button></p>
     <p class="muted"><a href="/market/">← All shops · كل المتاجر</a></p>`;
   const { data: rv } = await sb.from('reviews').select('*').eq('seller_id', s.id).eq('status', 'published').order('created_at', { ascending: false }).limit(30);
   $('#shopReviews').innerHTML = `<h2>Reviews · التقييمات</h2><div class="card">${reviewList(rv)}</div>`;
@@ -99,7 +102,8 @@ $('#q').oninput = render;
 async function openPM(id) {
   const p = ALL.find(x => x.id === id); if (!p) return;
   const imgs = p.images.length ? p.images : [''], r = PR[p.id] || {}, isV = p.kind === 'voucher';
-  const avail = isV || p.stock > 0;
+  const paused = isPaused(p.sellers);
+  const avail = !paused && (isV || p.stock > 0);
   $('#pmBody').innerHTML = `<div class="pd">
     <div><div class="main" id="mainImg" style="background-image:url('${esc(imgUrl(imgs[0]))}')"></div>
       <div class="thumbs">${imgs.map(i => `<div style="background-image:url('${esc(imgUrl(i))}')" onclick="$('#mainImg').style.backgroundImage='url(${esc(imgUrl(i))})'"></div>`).join('')}</div></div>
@@ -114,7 +118,8 @@ async function openPM(id) {
         <span class="ar">${+p.voucher_value > +p.price ? `ادفعي ${p.price} درهم دلوقتي — وبعد سنة خدي منتجات بقيمة ${p.voucher_value} درهم من المتجر. ` : ''}قسيمة الشراء المسبق بتدّي المتجر رأس مال دلوقتي، وبتتصرف منتجات بس من نفس المتجر (مش فلوس)، بعد سنة من الشراء وخلال الـ12 شهر اللي بعدها.</span></div>` : `<p class="muted">${esc(catName(p.category))}</p>`}
       <p style="white-space:pre-line;margin:12px 0">${esc(p.description || '')}</p>
       ${avail ? `<label>Quantity · الكمية</label><input type="number" id="qty" min="1" max="${isV ? 10 : p.stock}" value="1" style="max-width:110px">
-      <br><button class="btn" onclick="addCart(${p.id})">Add to cart · أضيفي للسلة</button>` : '<p><span class="tag cancelled">Sold out · نفدت الكمية</span></p>'}
+      <br><button class="btn" onclick="addCart(${p.id})">Add to cart · أضيفي للسلة</button>` : (paused ? `<p class="note" style="background:#fff3cd">⏸ Shop on a break until ${fmtDate(p.sellers.paused_until)} · المتجر في إجازة</p>` : '<p><span class="tag cancelled">Sold out · نفدت الكمية</span></p>')}
+      ${!isV && p.sellers.lead_time_days ? `<p class="muted">⏱ Ready in about ${p.sellers.lead_time_days} day(s) · بيجهز في ${p.sellers.lead_time_days} يوم</p>` : ''}
     </div></div>
     <h2>Reviews · التقييمات</h2><div id="pmRev"><p class="muted">Loading…</p></div>`;
   $('#pm').classList.add('open');
@@ -122,6 +127,20 @@ async function openPM(id) {
   $('#pmRev').innerHTML = reviewList(data);
 }
 function giftFrom(sid) { const v = ALL.find(x => x.kind === 'voucher' && x.seller_id === sid); if (v) openPM(v.id); }
+function isPaused(s) { return s && s.paused_until && s.paused_until >= new Date().toISOString().slice(0, 10); }
+function askShop(id, name) {
+  $('#pmBody').innerHTML = `<h2 style="margin-top:0">Ask ${esc(name)} · اسألي المتجر</h2>
+    <form id="ef"><div class="row"><div><label>Name · الاسم</label><input name="name" required maxlength="100"></div>
+    <div><label>Mobile / WhatsApp · الموبايل</label><input name="phone" required maxlength="30" placeholder="+971…"></div></div>
+    <label>Email (optional)</label><input name="email" type="email" maxlength="120">
+    <label>Your question · سؤالك</label><textarea name="message" rows="4" required maxlength="1500" placeholder="e.g. Can you make a custom order for 20 guests? · ممكن طلب خاص؟"></textarea>
+    <p class="muted">The shop replies on WhatsApp or email. Your details go to this shop only. · بياناتك بتروح للمتجر ده بس.</p>
+    <button class="btn">Send · إرسال</button></form>`;
+  $('#pm').classList.add('open');
+  $('#ef').onsubmit = async e => { e.preventDefault(); const f = new FormData(e.target);
+    const { error } = await sb.rpc('submit_enquiry', { p_seller: id, p_name: f.get('name'), p_phone: f.get('phone'), p_email: f.get('email') || null, p_message: f.get('message') });
+    if (error) return toast(errMsg(error)); closePM(); toast('Sent! The shop will reply soon. · اتبعت 🌷'); };
+}
 function closePM() { $('#pm').classList.remove('open'); }
 $('#pm').onclick = e => { if (e.target.id === 'pm') closePM(); };
 function addCart(id) {

@@ -4,15 +4,15 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>WARD Admin</title>
 <meta name="robots" content="noindex,nofollow">
-<link rel="icon" href="/favicon.png"><link rel="stylesheet" href="market.css?v=11">
+<link rel="icon" href="/favicon.png"><link rel="stylesheet" href="market.css?v=12">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.min.js"></script>
-<script src="ward.js?v=11"></script>
+<script src="ward.js?v=12"></script>
 </head>
 <body>
 <main class="wrap" id="app"><p class="muted">Loading…</p></main>
 <script>
 header('');
-let TAB = 'sellers', USER = null;
+let TAB = 'founding', USER = null;
 
 async function boot() {
   await loadRates();
@@ -32,9 +32,9 @@ async function boot() {
 
 function draw() {
   $('#app').innerHTML = `<h1>WARD Admin</h1><p class="muted">${esc(USER.email)} · <a href="#" onclick="sb.auth.signOut().then(boot);return false">log out</a></p>
-  <div class="tabs">${[['sellers','Sellers · البائعات'],['orders','Orders · الطلبات'],['payouts','Payouts · التحويلات'],['reviews','Reviews · التقييمات'],['vouchers','Vouchers · القسائم'],['money','WARD revenue · إيرادات وَرد'],['settings','Settings · الإعدادات']]
+  <div class="tabs">${[['founding','Founding 100 · المؤسِّسات'],['cases','Cases · الشكاوى'],['enquiries','Enquiries · الاستفسارات'],['data','Data requests · طلبات البيانات'],['sellers','Sellers · البائعات'],['orders','Orders · الطلبات'],['payouts','Payouts · التحويلات'],['reviews','Reviews · التقييمات'],['vouchers','Vouchers · القسائم'],['money','WARD revenue · إيرادات وَرد'],['settings','Settings · الإعدادات']]
     .map(([k, l]) => `<button class="${TAB===k?'on':''}" onclick="TAB='${k}';draw()">${l}</button>`).join('')}</div><div id="pane">Loading…</div>`;
-  ({ sellers, orders, payouts, reviews, vouchers, money, settings })[TAB]();
+  ({ founding, cases, enquiries, data: dataReq, sellers, orders, payouts, reviews, vouchers, money, settings })[TAB]();
 }
 
 async function sellers() {
@@ -78,7 +78,7 @@ async function payouts() {
     <td><button class="btn small" onclick='markPaid(${JSON.stringify(x.ids)})'>Mark paid</button></td></tr>`).join('')}</table></div>
   ${Object.keys(g).length ? '' : '<p class="muted">No payouts waiting.</p>'}`;
 }
-async function markPaid(ids) { if (!confirm('Mark these orders as paid out?')) return; const { error } = await sb.from('orders').update({ payout_status: 'paid' }).in('id', ids); toast(error ? errMsg(error) : 'Marked paid'); payouts(); }
+async function markPaid(ids) { const ref = prompt('Bank transfer reference (optional) · رقم التحويل'); if (ref === null) return; const { error } = await sb.from('orders').update({ payout_status: 'paid', payout_paid_at: new Date().toISOString(), payout_reference: ref || null }).in('id', ids); toast(error ? errMsg(error) : 'Marked paid'); payouts(); }
 
 async function money() {
   const { data } = await sb.from('orders').select('status,total_paid,commission,vat,handling_fee,gateway_delivery,ward_net,seller_net');
@@ -128,6 +128,66 @@ async function vouchers() {
   </table></div>${(data || []).length ? '' : '<p class="muted">No vouchers yet.</p>'}`;
 }
 async function voidV(c) { if (!confirm('Void this voucher?')) return; const { error } = await sb.from('vouchers').update({ status: 'void' }).eq('code', c); toast(error ? errMsg(error) : 'Voided'); vouchers(); }
+
+const FSTEPS = [['new','New · جديد'],['reviewing','Reviewing · مراجعة'],['selected','Selected · مختارة'],['verified','Verified · تم التحقق'],['agreement_sent','Agreement sent · أُرسل العقد'],['activated','Activated · مفعّلة'],['waitlist','Waitlist · انتظار'],['declined','Declined · مرفوضة']];
+async function founding() {
+  const { data, error } = await sb.from('founding_applications').select('*').order('created_at', { ascending: false });
+  if (error) return $('#pane').innerHTML = esc(error.message);
+  const a = data || [], taken = a.filter(x => ['selected','verified','agreement_sent','activated'].includes(x.status)).length;
+  $('#pane').innerHTML = `<div class="kpis"><div class="kpi">Applications · الطلبات<b>${a.length}</b></div>
+    <div class="kpi">New · جديدة<b>${a.filter(x => x.status === 'new').length}</b></div>
+    <div class="kpi">Places taken · الأماكن<b>${taken} / 100</b></div>
+    <div class="kpi">Activated · مفعّلة<b>${a.filter(x => x.status === 'activated').length}</b></div></div>
+  <div class="note">Steps: New → Reviewing → Selected → Verified → Agreement sent → Activated (after the AED 1,200 contribution is paid). Change the step from the list. · غيّري المرحلة من القايمة.</div>
+  <div style="overflow-x:auto"><table><tr><th>Applicant</th><th>Business</th><th>Contact</th><th>Details</th><th>Step</th><th>Notes</th></tr>
+  ${a.map(x => `<tr><td><b>${esc(x.name)}</b><br><span class="muted">${esc(x.ref)} · ${fmtDate(x.created_at)}</span></td>
+    <td>${esc(x.business)}<br><span class="muted">${esc(x.category || '')} · ${esc(x.emirate || '')}</span></td>
+    <td><a href="https://wa.me/${esc((x.whatsapp || '').replace(/\D/g,''))}" target="_blank">${esc(x.whatsapp)}</a><br>${esc(x.email || '')}<br>${esc(x.social || '')}</td>
+    <td>${esc(x.entity || '')}<br>${x.licence ? 'Licence: ' + esc(x.licence) : '<span class="muted">no licence no.</span>'}<br>${x.marketing ? 'OK to market' : ''}</td>
+    <td><select style="margin:0" onchange="fUpd(${x.id},{status:this.value})">${FSTEPS.map(([k, l]) => `<option value="${k}" ${k === x.status ? 'selected' : ''}>${l}</option>`).join('')}</select></td>
+    <td><textarea style="margin:0;min-width:160px" rows="2" onchange="fUpd(${x.id},{admin_notes:this.value})">${esc(x.admin_notes || '')}</textarea></td></tr>`).join('')}
+  </table></div>${a.length ? '' : '<p class="muted">No applications yet.</p>'}`;
+}
+async function fUpd(id, row) { const { error } = await sb.from('founding_applications').update(row).eq('id', id); toast(error ? errMsg(error) : 'Saved · اتحفظ'); founding(); }
+
+const CTYPES = { not_received: 'Not received · ما وصلش', damaged: 'Damaged · تالف', wrong_item: 'Wrong item · منتج غلط', late: 'Late · متأخر', refund: 'Refund · استرجاع', voucher: 'Voucher · قسيمة', seller_conduct: 'Seller conduct · سلوك البائعة', other: 'Other · أخرى' };
+async function cases() {
+  const { data, error } = await sb.from('cases').select('*,orders(ref),sellers(shop_name)').order('created_at', { ascending: false });
+  if (error) return $('#pane').innerHTML = esc(error.message);
+  const c = data || [];
+  $('#pane').innerHTML = `<div class="kpis"><div class="kpi">Open · مفتوحة<b>${c.filter(x => x.status === 'open').length}</b></div>
+    <div class="kpi">In progress · جاري<b>${c.filter(x => x.status === 'in_progress').length}</b></div><div class="kpi">Resolved · اتحلّت<b>${c.filter(x => ['resolved','closed'].includes(x.status)).length}</b></div></div>
+  <div style="overflow-x:auto"><table><tr><th>Case</th><th>Buyer</th><th>Problem</th><th>Status</th><th>Resolution (buyer sees this)</th></tr>
+  ${c.map(x => `<tr><td><b>${esc(x.ref)}</b><br><span class="muted">${fmtDate(x.created_at)}</span><br>Order ${esc(x.orders?.ref || '')}<br>${esc(x.sellers?.shop_name || '')}</td>
+    <td>${esc(x.name || '')}<br><a href="https://wa.me/${esc((x.phone || '').replace(/\D/g,''))}" target="_blank">${esc(x.phone)}</a></td>
+    <td><b>${esc(CTYPES[x.type] || x.type)}</b><br>${esc(x.message)}</td>
+    <td><select style="margin:0" onchange="cUpd(${x.id},{status:this.value})">${['open','in_progress','resolved','closed'].map(k => `<option ${k === x.status ? 'selected' : ''}>${k}</option>`).join('')}</select></td>
+    <td><textarea style="margin:0;min-width:180px" rows="2" onchange="cUpd(${x.id},{resolution:this.value})">${esc(x.resolution || '')}</textarea></td></tr>`).join('')}
+  </table></div>${c.length ? '' : '<p class="muted">No cases.</p>'}`;
+}
+async function cUpd(id, row) { const { error } = await sb.from('cases').update(row).eq('id', id); toast(error ? errMsg(error) : 'Saved'); cases(); }
+
+async function enquiries() {
+  const { data } = await sb.from('enquiries').select('*,sellers(shop_name)').order('created_at', { ascending: false }).limit(300);
+  $('#pane').innerHTML = `<div class="note">Buyers' questions to shops. Each shop sees and answers its own; this is the full list.</div>
+  <div style="overflow-x:auto"><table><tr><th>Shop</th><th>From</th><th>Message</th><th>Status</th></tr>
+  ${(data || []).map(x => `<tr><td>${esc(x.sellers?.shop_name)}<br><span class="muted">${fmtDate(x.created_at)}</span></td>
+    <td>${esc(x.name)}<br><a href="https://wa.me/${esc(x.phone.replace(/\D/g,''))}" target="_blank">${esc(x.phone)}</a><br>${esc(x.email || '')}</td>
+    <td>${esc(x.message)}</td><td>${tag(x.status)}</td></tr>`).join('')}</table></div>${(data || []).length ? '' : '<p class="muted">No enquiries.</p>'}`;
+}
+
+async function dataReq() {
+  const { data } = await sb.from('data_requests').select('*').order('created_at', { ascending: false });
+  $('#pane').innerHTML = `<div class="note">Privacy requests. Verify the person (reply from the same email or WhatsApp) before acting. Respond within 30 days. Deleting an account: remove the user in Supabase → Authentication; keep order records needed for tax/accounting.</div>
+  <div style="overflow-x:auto"><table><tr><th>Request</th><th>Person</th><th>Details</th><th>Status</th><th>Notes</th></tr>
+  ${(data || []).map(x => `<tr><td><b>${esc(x.ref)}</b><br>${esc(x.type)}<br><span class="muted">${fmtDate(x.created_at)}</span></td>
+    <td>${esc(x.name || '')}<br>${esc(x.email || '')}<br>${esc(x.phone || '')}${x.user_id ? '<br><span class="muted">has account</span>' : ''}</td>
+    <td>${esc(x.details || '')}</td>
+    <td><select style="margin:0" onchange="dUpd(${x.id},{status:this.value})">${['new','verifying','done','rejected'].map(k => `<option ${k === x.status ? 'selected' : ''}>${k}</option>`).join('')}</select></td>
+    <td><textarea style="margin:0" rows="2" onchange="dUpd(${x.id},{admin_notes:this.value})">${esc(x.admin_notes || '')}</textarea></td></tr>`).join('')}
+  </table></div>${(data || []).length ? '' : '<p class="muted">No requests.</p>'}`;
+}
+async function dUpd(id, row) { const { error } = await sb.from('data_requests').update(row).eq('id', id); toast(error ? errMsg(error) : 'Saved'); dataReq(); }
 boot();
 </script>
 </body>

@@ -4,9 +4,9 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Seller Centre · مركز البائعات — WARD</title>
 <meta name="robots" content="noindex">
-<link rel="icon" href="/favicon.png"><link rel="stylesheet" href="market.css?v=11">
+<link rel="icon" href="/favicon.png"><link rel="stylesheet" href="market.css?v=12">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.min.js"></script>
-<script src="ward.js?v=11"></script>
+<script src="ward.js?v=12"></script>
 </head>
 <body>
 <main class="wrap" id="app"><p class="muted">Loading…</p></main>
@@ -121,10 +121,10 @@ function dash() {
   $('#app').innerHTML = `<h1>${esc(SELLER.shop_name)}</h1>
   <p class="muted">${tag(SELLER.status)} · Plan: ${esc(SELLER.plan)} · ${esc(USER.email)} · <a href="/market/?shop=${encodeURIComponent(SELLER.slug)}" target="_blank">view my shop</a> · <a href="#" onclick="logout();return false"><b>Log out · خروج</b></a></p>
   ${st ? `<div class="note">${st}</div>` : ''}
-  <div class="tabs">${[['products','Products · المنتجات'],['orders','Orders · الطلبات'],['earnings','Earnings · أرباحي'],['vouchers','Advance Purchase Vouchers · قسائم الشراء المسبق'],['reviews','Reviews · التقييمات'],['shop','Shop page · صفحة المتجر']]
+  <div class="tabs">${[['products','Products · المنتجات'],['orders','Orders · الطلبات'],['enquiries','Messages · الاستفسارات'],['cases','Complaints · الشكاوى'],['earnings','Earnings · أرباحي'],['vouchers','Advance Purchase Vouchers · قسائم الشراء المسبق'],['reviews','Reviews · التقييمات'],['shop','Shop page · صفحة المتجر']]
     .map(([k, l]) => `<button class="${TAB===k?'on':''}" onclick="TAB='${k}';dash()">${l}</button>`).join('')}</div>
   <div id="pane"><p class="muted">Loading…</p></div>`;
-  ({ products: productsPane, orders: ordersPane, earnings: earningsPane, vouchers: vouchersPane, reviews: reviewsPane, shop: shopPane })[TAB]();
+  ({ products: productsPane, orders: ordersPane, enquiries: enquiriesPane, cases: casesPane, earnings: earningsPane, vouchers: vouchersPane, reviews: reviewsPane, shop: shopPane })[TAB]();
 }
 
 async function productsPane() {
@@ -215,8 +215,41 @@ async function setStatus(id, s) {
   if (error) return toast(errMsg(error)); ordersPane();
 }
 
+let STMT = [];
+function statement(o) {
+  STMT = o.filter(x => !['new','accepted','shipped'].includes(x.status));
+  if (!STMT.length) return '<p class="muted">No completed orders yet. · لسه مفيش طلبات مكتملة.</p>';
+  const groups = {};
+  STMT.forEach(x => { const k = x.payout_status === 'paid' ? 'Paid ' + fmtDate(x.payout_paid_at) + (x.payout_reference ? ' · ref ' + x.payout_reference : '') : x.status === 'delivered' ? 'Due ' + fmtDate(x.payout_date) : 'Not payable (' + x.status + ')'; (groups[k] = groups[k] || []).push(x); });
+  return Object.entries(groups).map(([k, rows]) => `<div class="card"><b>${esc(k)}</b>
+    <div style="overflow-x:auto"><table style="margin-top:8px"><tr><th>Order</th><th>Sales</th><th>Voucher used</th><th>WARD fee</th><th>Card fee</th><th>You receive</th></tr>
+    ${rows.map(x => `<tr><td>${esc(x.ref)}<br><span class="muted">${fmtDate(x.delivered_at || x.created_at)}</span></td><td>${aed(x.items_total)}</td><td>${+x.voucher_applied ? '− ' + aed(x.voucher_applied) : '—'}</td>
+      <td>− ${aed(+x.commission + +x.vat)}</td><td>${+x.gateway_items ? '− ' + aed(x.gateway_items) : '—'}</td><td><b>${aed(x.seller_net)}</b></td></tr>`).join('')}
+    <tr><th colspan="5">Total · الإجمالي</th><th>${aed(rows.reduce((a, x) => a + +x.seller_net, 0))}</th></tr></table></div></div>`).join('');
+}
+function csvStatement() {
+  const head = ['order','status','delivered','sales','voucher_used','ward_fee','card_fee','you_receive','payout_date','payout_status','paid_at','reference'];
+  const rows = STMT.map(x => [x.ref, x.status, x.delivered_at || '', x.items_total, x.voucher_applied, (+x.commission + +x.vat).toFixed(2), x.gateway_items, x.seller_net, x.payout_date || '', x.payout_status, x.payout_paid_at || '', x.payout_reference || '']);
+  const csv = [head, ...rows].map(r => r.map(v => '"' + String(v ?? '').replace(/"/g, '""') + '"').join(',')).join('\n');
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' })); a.download = 'WARD-statement-' + SELLER.slug + '.csv'; a.click();
+}
+async function enquiriesPane() {
+  const { data } = await sb.from('enquiries').select('*').eq('seller_id', USER.id).order('created_at', { ascending: false });
+  $('#pane').innerHTML = (data || []).map(x => `<div class="card"><div class="split"><b>${esc(x.name)}</b><span>${tag(x.status)} ${fmtDate(x.created_at)}</span></div>
+    <p style="margin:6px 0;white-space:pre-line">${esc(x.message)}</p>
+    <a class="btn small" target="_blank" href="https://wa.me/${esc(x.phone.replace(/\D/g,''))}?text=${encodeURIComponent('Hello ' + x.name + ', thank you for your message to ' + SELLER.shop_name + ' on WARD 🌷')}" onclick="enqSt(${x.id},'replied')">Reply on WhatsApp · ردّي</a>
+    ${x.email ? `<a class="btn small ghost" href="mailto:${esc(x.email)}">Email</a>` : ''}
+    ${x.status !== 'closed' ? `<button class="btn small ghost" onclick="enqSt(${x.id},'closed')">Close · قفل</button>` : ''}</div>`).join('') || '<p class="muted">No messages yet. · لسه مفيش استفسارات.</p>';
+}
+async function enqSt(id, s) { await sb.from('enquiries').update({ status: s }).eq('id', id); setTimeout(enquiriesPane, 300); }
+async function casesPane() {
+  const { data } = await sb.from('cases').select('*,orders(ref)').eq('seller_id', USER.id).order('created_at', { ascending: false });
+  $('#pane').innerHTML = `<div class="note">Complaints from buyers about your orders. WARD handles each case and may contact you. · الشكاوى بتتابعها وَرد وممكن تكلمك.</div>` +
+    ((data || []).map(x => `<div class="card"><div class="split"><b>${esc(x.ref)} · order ${esc(x.orders?.ref || '')}</b>${tag(x.status)}</div>
+      <p><b>${esc(x.type)}</b>: ${esc(x.message)}</p>${x.resolution ? `<p class="muted">WARD: ${esc(x.resolution)}</p>` : ''}</div>`).join('') || '<p class="muted">No complaints. 🌷</p>');
+}
 async function earningsPane() {
-  const { data } = await sb.from('orders').select('ref,status,seller_net,commission,items_total,delivered_at,payout_date,payout_status').eq('seller_id', USER.id).order('created_at', { ascending: false });
+  const { data } = await sb.from('orders').select('ref,status,seller_net,commission,vat,gateway_items,items_total,voucher_applied,delivered_at,payout_date,payout_status,payout_paid_at,payout_reference,created_at').eq('seller_id', USER.id).order('created_at', { ascending: false });
   const o = data || [];
   const sum = f => o.filter(f).reduce((a, x) => a + +x.seller_net, 0);
   const paid = sum(x => x.payout_status === 'paid'), upcoming = sum(x => x.status === 'delivered' && x.payout_status === 'unpaid'),
@@ -227,6 +260,8 @@ async function earningsPane() {
     <div class="kpi">Scheduled payouts · مستحق<b>${aed(upcoming)}</b></div>
     <div class="kpi">In open orders · طلبات جارية<b>${aed(open)}</b></div>
     <div class="kpi">WARD commission on delivered · العمولة<b>${aed(comm)}</b></div></div>
+    <h2>Statement · كشف الحساب <button class="btn small ghost" onclick="window.print()">Print / PDF</button> <button class="btn small ghost" onclick="csvStatement()">Download CSV</button></h2>
+    ${statement(o)}
     <h2>Next payouts · مواعيد التحويل</h2>
     ${Object.keys(byDate).sort().map(d => `<div class="split card" style="margin-bottom:8px"><span>${fmtDate(d)}</span><b>${aed(byDate[d])}</b></div>`).join('') || '<p class="muted">Nothing scheduled yet.</p>'}
     <div class="note">Payouts run every 14 days for orders delivered at least 7 days earlier (see <a href="/terms.html" target="_blank">Conditions of Use</a>).<br>
@@ -239,11 +274,16 @@ function shopPane() {
   $('#pane').innerHTML = `<form class="card" id="sf">
     <div class="row"><div><label>Shop logo · لوجو المتجر</label><div class="imgs" id="logoPrev"></div><input type="file" accept="image/jpeg,image/png,image/webp" onchange="shopImg('logo_url',this)"></div>
     <div><label>Cover photo · صورة الغلاف</label><div class="imgs" id="coverPrev"></div><input type="file" accept="image/jpeg,image/png,image/webp" onchange="shopImg('cover_url',this)"></div></div>
+    <div class="card" style="background:var(--cream)"><b>Availability · مواعيد الشغل</b>
+      <div class="row"><div><label>Pause my shop until · إيقاف المتجر لحد</label><input type="date" name="paused_until" value="${SELLER.paused_until || ''}"><span class="muted">Leave empty to stay open. Buyers see your shop but can't order until then. · سيبيه فاضي لو شغالة.</span></div>
+      <div><label>Days to prepare an order · أيام التجهيز</label><input type="number" name="lead_time_days" min="0" max="60" value="${SELLER.lead_time_days || 0}"><span class="muted">Shown to buyers, e.g. "ready in 3 days". · بيظهر للعميلة.</span></div></div>
+      <label>Message while paused (optional) · رسالة وقت الإيقاف</label><input name="pause_message" maxlength="200" value="${esc(SELLER.pause_message || '')}" placeholder="e.g. Back after Eid · راجعين بعد العيد"></div>
     ${shopForm(SELLER)}<button class="btn">Save · حفظ</button>
     <a class="btn ghost" href="/market/?shop=${encodeURIComponent(SELLER.slug)}" target="_blank">See my shop page · شوفي صفحة متجرك</a></form>`;
   drawShopImgs();
   $('#sf').onsubmit = async e => {
     e.preventDefault(); const f = Object.fromEntries(new FormData(e.target)); Object.assign(f, SHOPIMG);
+    f.paused_until = f.paused_until || null; f.lead_time_days = +f.lead_time_days || 0;
     const { error } = await sb.from('sellers').update(f).eq('id', USER.id);
     if (error) return toast(errMsg(error)); toast('Saved · تم الحفظ'); boot();
   };

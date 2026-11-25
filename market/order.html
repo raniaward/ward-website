@@ -4,9 +4,9 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>My order · طلبي — WARD</title>
 <meta name="robots" content="noindex">
-<link rel="icon" href="/favicon.png"><link rel="stylesheet" href="market.css?v=11">
+<link rel="icon" href="/favicon.png"><link rel="stylesheet" href="market.css?v=12">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.min.js"></script>
-<script src="ward.js?v=11"></script>
+<script src="ward.js?v=12"></script>
 </head>
 <body>
 <main class="wrap" style="max-width:760px">
@@ -49,7 +49,8 @@ async function load() {
     ${(O.items || []).length && O.items.every(i => i.kind === 'voucher') && !['cancelled','refunded'].includes(O.status) && (Date.now() - new Date(O.created_at)) < 14 * 864e5 && (O.vouchers || []).every(v => +v.balance === +v.value) ?
       `<p><button class="btn small ghost" onclick="cancelV()">Cancel this voucher order (within 14 days) · إلغاء القسيمة خلال 14 يوم</button></p>` : ''}
     ${!(O.items || []).some(i => i.kind !== 'voucher') ? '' : O.status === 'delivered' ? `<h2>Rate your items · قيّمي مشترياتك</h2>${(O.items || []).filter(i => i.kind !== 'voucher' && i.product_id).map(rateCard).join('')}` :
-      `<p class="note">You can rate your items once the order is delivered. · تقدري تقيّمي بعد الاستلام.</p>`}`;
+      `<p class="note">You can rate your items once the order is delivered. · تقدري تقيّمي بعد الاستلام.</p>`}${casesBlock()}`;
+  if ($('#caseF')) $('#caseF').onsubmit = sendCase;
 }
 
 async function cancelV() {
@@ -59,6 +60,24 @@ async function cancelV() {
   try { fetch('https://api.web3forms.com/submit', { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
     body: JSON.stringify({ access_key: 'f21e0196-4584-4e59-af8e-26524f373dee', subject: 'WARD voucher cancelled — refund needed: ' + REF, from_name: 'WARD marketplace', order: REF, phone: PHONE }) }).catch(() => {}); } catch {}
   toast('Cancelled. WARD will contact you about your refund. · اتلغت، وَرد هتكلمك بخصوص الفلوس.'); load();
+}
+function casesBlock() {
+  const cs = O.cases || [];
+  return `<h2>Need help with this order? · محتاجة مساعدة؟</h2>
+    ${cs.map(c => `<div class="card"><div class="split"><b>Case ${esc(c.ref)}</b>${tag(c.status)}</div><p class="muted">${esc(c.type)} · ${fmtDate(c.created_at)}</p>${c.resolution ? `<p><b>WARD:</b> ${esc(c.resolution)}</p>` : '<p class="muted">We are looking into it. · بنتابعها.</p>'}</div>`).join('')}
+    <details class="card"><summary style="cursor:pointer"><b>Report a problem · بلّغي عن مشكلة</b></summary>
+      <form id="caseF" style="margin-top:10px"><label>What happened? · إيه المشكلة؟</label>
+      <select name="type"><option value="not_received">Not received · الطلب ما وصلش</option><option value="late">Late · متأخر</option><option value="damaged">Damaged · وصل تالف</option><option value="wrong_item">Wrong item · منتج غلط</option><option value="refund">Refund request · استرجاع فلوس</option><option value="voucher">Voucher problem · مشكلة في القسيمة</option><option value="seller_conduct">Seller behaviour · تعامل البائعة</option><option value="other">Other · حاجة تانية</option></select>
+      <label>Details · التفاصيل</label><textarea name="message" rows="3" required maxlength="2000"></textarea>
+      <button class="btn">Send to WARD · ابعتي لوَرد</button></form></details>`;
+}
+async function sendCase(e) {
+  e.preventDefault(); const f = new FormData(e.target);
+  const { data, error } = await sb.rpc('submit_case', { p_ref: REF, p_phone: PHONE, p_type: f.get('type'), p_message: f.get('message') });
+  if (error) return toast(errMsg(error));
+  try { fetch('https://api.web3forms.com/submit', { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ access_key: 'f21e0196-4584-4e59-af8e-26524f373dee', subject: 'WARD complaint ' + data + ' on order ' + REF, from_name: 'WARD marketplace', type: f.get('type'), message: f.get('message') }) }).catch(() => {}); } catch {}
+  toast('Case ' + data + ' opened. WARD will contact you. · اتسجلت الشكوى'); load();
 }
 const PICK = {}, PHOTOS = {};
 function rateCard(i) {

@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Services directory · دليل الخدمات — WARD</title>
+<meta name="description" content="Find services offered by women-owned businesses in the UAE and send them a question.">
+<link rel="canonical" href="https://wardworld.org/market/services.html">
+<link rel="icon" href="/favicon.png"><link rel="stylesheet" href="market.css?v=12">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.min.js"></script>
+<script src="ward.js?v=12"></script>
+</head>
+<body>
+<main class="wrap">
+  <h1>Services directory <span class="ar">· دليل الخدمات</span></h1>
+  <p class="muted">Home services, beauty, events, tutoring, design and more, from women-owned businesses. Ask a question before you book. · خدمات من مشاريع نسائية، واسألي قبل ما تحجزي.</p>
+  <input id="q" placeholder="Search services · ابحثي عن خدمة" style="max-width:420px;margin-top:14px">
+  <div class="chips" id="em"></div>
+  <div id="list"><p class="muted">Loading…</p></div>
+</main>
+<div class="modal" id="pm"><div class="box"><button class="x" onclick="$('#pm').classList.remove('open')">×</button><div id="pmBody"></div></div></div>
+<script>
+header('services');
+let SH = [], PRODS = [], SR = {}, EM = '';
+const SERVICE_CATS = ['services', 'art'];
+async function init() {
+  const [{ data: s }, { data: p }, { data: r }] = await Promise.all([
+    sb.from('sellers').select('id,shop_name,slug,bio,emirate,category,logo_url,paused_until,lead_time_days').eq('status', 'approved').in('category', SERVICE_CATS).order('shop_name'),
+    sb.from('products').select('id,title,price,seller_id,kind').eq('status', 'active').in('category', SERVICE_CATS).neq('kind', 'voucher'),
+    sb.from('seller_ratings').select('*')]);
+  SH = s || []; PRODS = p || []; (r || []).forEach(x => SR[x.seller_id] = x);
+  const ems = [...new Set(SH.map(x => x.emirate).filter(Boolean))].sort();
+  $('#em').innerHTML = `<button class="chip on" data-e="">All emirates · كل الإمارات</button>` + ems.map(e => `<button class="chip" data-e="${esc(e)}">${esc(e)}</button>`).join('');
+  $$('#em .chip').forEach(b => b.onclick = () => { EM = b.dataset.e; $$('#em .chip').forEach(x => x.classList.toggle('on', x === b)); draw(); });
+  draw();
+}
+function draw() {
+  const t = $('#q').value.trim().toLowerCase();
+  const list = SH.filter(s => (!EM || s.emirate === EM) && (!t || (s.shop_name + ' ' + (s.bio || '') + ' ' + PRODS.filter(p => p.seller_id === s.id).map(p => p.title).join(' ')).toLowerCase().includes(t)));
+  $('#list').innerHTML = list.map(s => { const r = SR[s.id] || {}, ps = PRODS.filter(p => p.seller_id === s.id);
+    const paused = s.paused_until && s.paused_until >= new Date().toISOString().slice(0, 10);
+    return `<div class="card" style="display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap">
+      <div style="width:64px;height:64px;border-radius:50%;background:var(--mist) center/cover;flex:none;background-image:url('${esc(imgUrl(s.logo_url))}')"></div>
+      <div style="flex:1;min-width:220px"><b style="font-size:17px">${esc(s.shop_name)}</b> <span class="muted">· ${esc(s.emirate || '')}</span>
+        <div>${stars(r.avg_rating, r.review_count)}</div>
+        ${paused ? `<span class="tag pending">On a break until ${fmtDate(s.paused_until)}</span>` : ''}
+        ${s.lead_time_days ? `<span class="muted"> · books ${s.lead_time_days} day(s) ahead</span>` : ''}
+        <ul style="margin:8px 0 8px 18px">${ps.map(p => `<li>${esc(p.title)} — <b>${aed(p.price)}</b></li>`).join('')}</ul>
+        <a class="btn small" href="/market/?shop=${encodeURIComponent(s.slug)}">View &amp; book · احجزي</a>
+        <button class="btn small ghost" onclick="askShop('${s.id}','${esc(s.shop_name).replace(/'/g, '')}')">💬 Ask a question · اسألي</button></div></div>`; }).join('')
+    || '<p class="empty">No services match. · مفيش نتايج.</p>';
+}
+$('#q').oninput = draw;
+function askShop(id, name) {
+  $('#pmBody').innerHTML = `<h2 style="margin-top:0">Ask ${esc(name)}</h2>
+    <form id="ef"><div class="row"><div><label>Name · الاسم</label><input name="name" required maxlength="100"></div>
+    <div><label>Mobile / WhatsApp · الموبايل</label><input name="phone" required maxlength="30" placeholder="+971…"></div></div>
+    <label>Email (optional)</label><input name="email" type="email" maxlength="120">
+    <label>Your question · سؤالك</label><textarea name="message" rows="4" required maxlength="1500" placeholder="Date, place, number of people… · التاريخ والمكان والعدد"></textarea>
+    <p class="muted">Your details go to this business only. · بياناتك بتروح للمشروع ده بس.</p>
+    <button class="btn">Send · إرسال</button></form>`;
+  $('#pm').classList.add('open');
+  $('#ef').onsubmit = async e => { e.preventDefault(); const f = new FormData(e.target);
+    const { error } = await sb.rpc('submit_enquiry', { p_seller: id, p_name: f.get('name'), p_phone: f.get('phone'), p_email: f.get('email') || null, p_message: f.get('message') });
+    if (error) return toast(errMsg(error)); $('#pm').classList.remove('open'); toast('Sent! · اتبعت 🌷'); };
+}
+init();
+</script>
+</body>
+</html>
