@@ -33,6 +33,8 @@ async function init() {
     <button class="chip" data-c="voucher">🌱 Advance Purchase Vouchers · قسائم الشراء المسبق</button>` +
     RATES.map(r => `<button class="chip" data-c="${r.key}">${esc(r.name_en)} · ${esc(r.name_ar)}</button>`).join('');
   $$('#chips .chip').forEach(b => b.onclick = () => { CAT = b.dataset.c; $$('#chips .chip').forEach(x => x.classList.toggle('on', x === b)); render(); });
+  const qc = new URLSearchParams(location.search).get('cat');
+  if (qc) { const ch = $$('#chips .chip').find(x => x.dataset.c === qc); if (ch) { CAT = qc; $$('#chips .chip').forEach(x => x.classList.toggle('on', x === ch)); } }
 
   let q = sb.from('products').select('id,title,description,price,voucher_value,category,stock,images,kind,seller_id,sellers!inner(shop_name,slug,emirate,status,paused_until,pause_message,lead_time_days)')
     .eq('status', 'active').eq('sellers.status', 'approved').order('created_at', { ascending: false }).limit(300);
