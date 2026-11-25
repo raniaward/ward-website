@@ -22,7 +22,11 @@ async function boot() {
   if (!USER) return authView();
   const { data } = await sb.from('sellers').select('*').eq('id', USER.id).maybeSingle();
   SELLER = data;
-  if (!SELLER) return applyView();
+  if (!SELLER) {
+    const { data: prof } = await sb.from('profiles').select('role').eq('id', USER.id).maybeSingle();
+    if (prof && prof.role === 'admin') return adminNote();
+    return applyView();
+  }
   dash();
 }
 sb.auth.onAuthStateChange((ev, s) => { const uid = s && s.user ? s.user.id : null; if ((ev === 'SIGNED_IN' || ev === 'SIGNED_OUT') && uid !== (USER && USER.id)) setTimeout(boot, 0); });
@@ -54,7 +58,11 @@ function authView(mode = 'login') {
         <p class="ar">بعتنالك لينك تأكيد على الإيميل. افتحيه وبعدين ارجعي هنا.</p></div>`;
     } else {
       const { error } = await sb.auth.signInWithPassword({ email: f.get('email'), password: f.get('password') });
-      if (error) toast(errMsg(error));
+      if (error) {
+        const m = errMsg(error);
+        toast(/confirm/i.test(m) ? 'Please confirm your email first — check your inbox. · أكّدي الإيميل الأول.' :
+              /invalid/i.test(m) ? 'Wrong email or password. Use "Forgot password" to reset it. · الإيميل أو كلمة السر غلط، استخدمي "نسيتي كلمة السر".' : m);
+      }
     }
   };
 }
@@ -66,6 +74,14 @@ async function resetPw() {
 if (location.hash.includes('type=recovery') || location.hash === '#reset') {
   sb.auth.onAuthStateChange(async ev => { if (ev === 'PASSWORD_RECOVERY') {
     const pw = prompt('New password (8+ characters) · كلمة سر جديدة'); if (pw) { const { error } = await sb.auth.updateUser({ password: pw }); toast(error ? errMsg(error) : 'Password updated'); } } });
+}
+
+function adminNote() {
+  $('#app').innerHTML = `<div class="card" style="max-width:560px"><h2 style="margin-top:0">You are logged in as WARD admin</h2>
+    <p>This is the admin account (${esc(USER.email)}), not a shop. To open a seller's account, log out first and log in with the seller's email.</p>
+    <p class="ar">إنتي داخلة بحساب الأدمن. عشان تدخلي على حساب بائعة: اعملي خروج الأول وبعدين ادخلي بإيميل البائعة.</p>
+    <p style="margin-top:12px"><a class="btn" href="/market/admin.html">Go to admin · لوحة الأدمن</a>
+    <button class="btn ghost" onclick="logout()">Log out · خروج</button></p></div>`;
 }
 
 /* ---------- APPLY ---------- */
@@ -81,7 +97,7 @@ function shopForm(s = {}) {
 }
 function applyView() {
   $('#app').innerHTML = `<h1>Open your shop <span class="ar">· افتحي متجرك</span></h1>
-  <p class="muted">Logged in as ${esc(USER.email)} · <a href="#" onclick="sb.auth.signOut();return false">log out</a></p>
+  <p class="muted">Logged in as ${esc(USER.email)} · <a href="#" onclick="logout();return false"><b>Log out · خروج</b></a></p>
   <form class="card" id="sf" style="margin-top:14px">${shopForm()}
     <label style="font-weight:normal"><input type="checkbox" required style="width:auto;margin:0 6px">
     I confirm the business is at least 51% woman-owned and I accept the <a href="/terms.html" target="_blank">Conditions of Use</a> and <a href="/conduct.html" target="_blank">Seller Code of Conduct</a>.
@@ -103,12 +119,12 @@ function dash() {
   const st = { pending: 'Your shop is under review. You can add products now — they go live once WARD approves your shop. · متجرك تحت المراجعة، تقدري تضيفي منتجاتك دلوقتي.',
                suspended: 'Your shop is paused. Please contact WARD. · متجرك موقوف مؤقتاً، كلمينا.', approved: '' }[SELLER.status];
   $('#app').innerHTML = `<h1>${esc(SELLER.shop_name)}</h1>
-  <p class="muted">${tag(SELLER.status)} · Plan: ${esc(SELLER.plan)} · ${esc(USER.email)} · <a href="/market/?shop=${encodeURIComponent(SELLER.slug)}" target="_blank">view my shop</a> · <a href="#" onclick="sb.auth.signOut();return false">log out</a></p>
+  <p class="muted">${tag(SELLER.status)} · Plan: ${esc(SELLER.plan)} · ${esc(USER.email)} · <a href="/market/?shop=${encodeURIComponent(SELLER.slug)}" target="_blank">view my shop</a> · <a href="#" onclick="logout();return false"><b>Log out · خروج</b></a></p>
   ${st ? `<div class="note">${st}</div>` : ''}
-  <div class="tabs">${[['products','Products · المنتجات'],['orders','Orders · الطلبات'],['earnings','Earnings · أرباحي'],['shop','Shop details · بيانات المتجر']]
+  <div class="tabs">${[['products','Products · المنتجات'],['orders','Orders · الطلبات'],['earnings','Earnings · أرباحي'],['vouchers','Gift vouchers · القسائم'],['reviews','Reviews · التقييمات'],['shop','Shop page · صفحة المتجر']]
     .map(([k, l]) => `<button class="${TAB===k?'on':''}" onclick="TAB='${k}';dash()">${l}</button>`).join('')}</div>
   <div id="pane"><p class="muted">Loading…</p></div>`;
-  ({ products: productsPane, orders: ordersPane, earnings: earningsPane, shop: shopPane })[TAB]();
+  ({ products: productsPane, orders: ordersPane, earnings: earningsPane, vouchers: vouchersPane, reviews: reviewsPane, shop: shopPane })[TAB]();
 }
 
 async function productsPane() {
@@ -117,19 +133,21 @@ async function productsPane() {
   $('#pane').innerHTML = `<button class="btn" onclick="editProd()">+ Add product · أضيفي منتج</button>
   <div class="grid" style="margin-top:16px">${PRODS.map(p => `<div class="prod" onclick="editProd(${p.id})">
     <div class="ph" style="background-image:url('${esc(imgUrl(p.images[0]))}')"></div>
-    <div class="in"><b>${esc(p.title)}</b><span class="price">${aed(p.price)}</span> · <span class="muted">stock ${p.stock}</span><br>${tag(p.status)}</div></div>`).join('')
+    <div class="in">${p.kind==='voucher'?'<span class="vbadge">🎁 voucher</span>':''}<b>${esc(p.title)}</b><span class="price">${aed(p.price)}</span> · <span class="muted">stock ${p.stock}</span><br>${tag(p.status)}</div></div>`).join('')
     || '<p class="muted">No products yet. · لسه مفيش منتجات.</p>'}</div>`;
 }
 
 let EDIT_IMGS = [];
 function editProd(id) {
-  const p = PRODS.find(x => x.id === id) || { title: '', description: '', price: '', category: SELLER.category, stock: 1, status: 'active', images: [] };
+  const p = PRODS.find(x => x.id === id) || { title: '', description: '', price: '', category: SELLER.category, stock: 1, status: 'active', images: [], kind: 'product' };
   EDIT_IMGS = [...p.images];
   $('#pmBody').innerHTML = `<h2 style="margin-top:0">${id ? 'Edit product · تعديل' : 'New product · منتج جديد'}</h2>
   <form id="pf">
+    <label>Type · النوع</label><select name="kind" id="kind"><option value="product" ${p.kind!=='voucher'?'selected':''}>Product · منتج</option><option value="voucher" ${p.kind==='voucher'?'selected':''}>🎁 Gift voucher for my shop · قسيمة هدية لمتجري</option></select>
+    <p class="muted" id="vhint" style="margin:-6px 0 10px"></p>
     <label>Title · اسم المنتج</label><input name="title" required maxlength="90" value="${esc(p.title)}">
     <div class="row"><div><label>Price (AED) · السعر</label><input name="price" type="number" step="0.01" min="1" required value="${p.price}"></div>
-    <div><label>Stock · الكمية المتاحة</label><input name="stock" type="number" min="0" required value="${p.stock}"></div></div>
+    <div id="stockBox"><label>Stock · الكمية المتاحة</label><input name="stock" type="number" min="0" required value="${p.stock}"></div></div>
     <div class="row"><div><label>Category · الفئة</label><select name="category">${catOptions(p.category)}</select></div>
     <div><label>Status · الحالة</label><select name="status"><option value="active" ${p.status==='active'?'selected':''}>Active · ظاهر</option><option value="draft" ${p.status==='draft'?'selected':''}>Draft · مخفي</option></select></div></div>
     <div class="note" id="keep"></div>
@@ -142,7 +160,9 @@ function editProd(id) {
   const keep = () => { const f = new FormData($('#pf')); const pr = parseFloat(f.get('price')) || 0;
     const k = sellerKeeps(pr, f.get('category'), SELLER.plan);
     $('#keep').innerHTML = pr ? `On a sale of ${aed(pr)}: WARD commission ${aed(k.comm)} → <b>you receive about ${aed(k.keep)}</b> (card payments also pass the card provider's fee at cost).<br><span class="ar">لو اتباع بـ ${pr} درهم: عمولة وَرد ${k.comm.toFixed(2)} ← هيوصلك تقريباً ${k.keep.toFixed(2)} درهم.</span>` : 'Enter a price to see what you receive. · اكتبي السعر عشان تشوفي هيوصلك كام.'; };
-  $('#pf').oninput = keep; keep(); drawImgs();
+  const kindUI = () => { const v = $('#kind').value === 'voucher'; $('#stockBox').style.display = v ? 'none' : '';
+    $('#vhint').textContent = v ? 'Buyers pay the voucher value now and spend it later at your shop only (valid 12 months). Example title: "Gift voucher AED 200". · العميلة تدفع قيمة القسيمة وتصرفها بعدين في متجرك بس.' : ''; };
+  $('#pf').oninput = () => { keep(); kindUI(); }; keep(); kindUI(); drawImgs();
   $('#file').onchange = async e => {
     for (const file of [...e.target.files].slice(0, 4 - EDIT_IMGS.length)) {
       if (file.size > 5242880) { toast('Photo too large (max 5 MB)'); continue; }
@@ -155,7 +175,7 @@ function editProd(id) {
   };
   $('#pf').onsubmit = async e => {
     e.preventDefault(); const f = Object.fromEntries(new FormData(e.target));
-    const row = { title: f.title, description: f.description, price: +f.price, stock: +f.stock, category: f.category, status: f.status, images: EDIT_IMGS };
+    const row = { title: f.title, description: f.description, price: +f.price, stock: f.kind === 'voucher' ? 9999 : +f.stock, category: f.category, status: f.status, images: EDIT_IMGS, kind: f.kind };
     $('#saveBtn').disabled = true;
     const { error } = id ? await sb.from('products').update(row).eq('id', id) : await sb.from('products').insert({ ...row, seller_id: USER.id });
     if (error) { $('#saveBtn').disabled = false; return toast(errMsg(error)); }
@@ -183,7 +203,9 @@ async function ordersPane() {
     <div class="split" style="margin-top:6px"><span>Payment</span><span>${esc(o.payment_method.toUpperCase())} · ${tag(o.payment_status)}</span></div>
     <div class="split"><span>You receive · صافي ليكي</span><b class="price">${aed(o.seller_net)}</b></div>
     <div style="margin-top:8px">${(next[o.status] || []).map(([s, l]) => `<button class="btn small ${s==='cancelled'?'ghost':''}" onclick="setStatus(${o.id},'${s}')">${l}</button>`).join(' ')}
-    ${o.status==='shipped' ? '<span class="muted">WARD marks it delivered once the buyer receives it. · وَرد بتأكد التسليم.</span>' : ''}</div></div>`).join('')
+    ${o.status==='shipped' ? '<span class="muted">WARD marks it delivered once the buyer receives it. · وَرد بتأكد التسليم.</span>' : ''}
+    ${o.status==='delivered' ? `<a class="btn small ghost" target="_blank" href="https://wa.me/${esc(o.buyer_phone.replace(/\D/g,''))}?text=${encodeURIComponent('Thank you for your order from ' + SELLER.shop_name + ' 🌷 Please rate it here / قيّمي طلبك هنا: https://wardworld.org/market/order.html?ref=' + o.ref)}">Ask for a review on WhatsApp · اطلبي تقييم</a>` : ''}
+    ${o.voucher_applied > 0 ? `<p class="muted">Voucher ${esc(o.voucher_code)} used: − ${aed(o.voucher_applied)}</p>` : ''}</div></div>`).join('')
     || '<p class="muted">No orders yet. · لسه مفيش طلبات.</p>';
 }
 async function setStatus(id, s) {
@@ -210,13 +232,57 @@ async function earningsPane() {
     <span class="ar">التحويل كل 14 يوم للطلبات اللي اتسلمت من 7 أيام أو أكتر.</span></div>`;
 }
 
+let SHOPIMG = {};
 function shopPane() {
-  $('#pane').innerHTML = `<form class="card" id="sf">${shopForm(SELLER)}<button class="btn">Save · حفظ</button></form>`;
+  SHOPIMG = { logo_url: SELLER.logo_url, cover_url: SELLER.cover_url };
+  $('#pane').innerHTML = `<form class="card" id="sf">
+    <div class="row"><div><label>Shop logo · لوجو المتجر</label><div class="imgs" id="logoPrev"></div><input type="file" accept="image/jpeg,image/png,image/webp" onchange="shopImg('logo_url',this)"></div>
+    <div><label>Cover photo · صورة الغلاف</label><div class="imgs" id="coverPrev"></div><input type="file" accept="image/jpeg,image/png,image/webp" onchange="shopImg('cover_url',this)"></div></div>
+    ${shopForm(SELLER)}<button class="btn">Save · حفظ</button>
+    <a class="btn ghost" href="/market/?shop=${encodeURIComponent(SELLER.slug)}" target="_blank">See my shop page · شوفي صفحة متجرك</a></form>`;
+  drawShopImgs();
   $('#sf').onsubmit = async e => {
-    e.preventDefault(); const f = Object.fromEntries(new FormData(e.target));
+    e.preventDefault(); const f = Object.fromEntries(new FormData(e.target)); Object.assign(f, SHOPIMG);
     const { error } = await sb.from('sellers').update(f).eq('id', USER.id);
     if (error) return toast(errMsg(error)); toast('Saved · تم الحفظ'); boot();
   };
+}
+function drawShopImgs() {
+  $('#logoPrev').innerHTML = SHOPIMG.logo_url ? `<div style="background-image:url('${esc(imgUrl(SHOPIMG.logo_url))}')"></div>` : '';
+  $('#coverPrev').innerHTML = SHOPIMG.cover_url ? `<div style="width:140px;background-image:url('${esc(imgUrl(SHOPIMG.cover_url))}')"></div>` : '';
+}
+async function shopImg(key, inp) {
+  const file = inp.files[0]; if (!file) return;
+  if (file.size > 5242880) return toast('Photo too large (max 5 MB)');
+  const path = `${USER.id}/${key}-${Date.now()}.${(file.name.split('.').pop() || 'jpg').toLowerCase()}`;
+  const { error } = await sb.storage.from('product-images').upload(path, file, { contentType: file.type });
+  if (error) return toast(errMsg(error));
+  SHOPIMG[key] = path; drawShopImgs(); toast('Photo ready — press Save · اضغطي حفظ');
+}
+
+async function vouchersPane() {
+  const { data } = await sb.from('vouchers').select('*').eq('seller_id', USER.id).order('created_at', { ascending: false });
+  const v = data || [];
+  const sold = v.reduce((a, x) => a + +x.value, 0), open = v.filter(x => x.status === 'active').reduce((a, x) => a + +x.balance, 0);
+  $('#pane').innerHTML = `<div class="note">Gift vouchers belong to your shop only. Add one from Products → "+ Add product" → Type: Gift voucher.
+    You are paid for a voucher when it is sold; when a buyer spends it later, that part of the order is not charged again.<br>
+    <span class="ar">القسائم خاصة بمتجرك بس. ضيفيها من المنتجات واختاري النوع "قسيمة هدية". بتاخدي فلوسها وقت البيع، ولما تتصرف بعدين الجزء ده مش بيتحسب تاني.</span></div>
+    <div class="kpis"><div class="kpi">Vouchers sold · قسائم اتباعت<b>${v.length}</b></div><div class="kpi">Total value · القيمة<b>${aed(sold)}</b></div>
+    <div class="kpi">Not yet spent · لسه متصرفتش<b>${aed(open)}</b></div></div>
+    <div style="overflow-x:auto;margin-top:14px"><table><tr><th>Code</th><th>Value</th><th>Balance</th><th>Status</th><th>Expires</th></tr>
+    ${v.map(x => `<tr><td>${x.status === 'pending' ? '—' : esc(x.code)}</td><td>${aed(x.value)}</td><td>${aed(x.balance)}</td><td>${tag(x.status)}</td><td>${fmtDate(x.expires_at)}</td></tr>`).join('')}</table></div>
+    ${v.length ? '' : '<p class="muted">No vouchers sold yet.</p>'}`;
+}
+
+async function reviewsPane() {
+  const [{ data }, { data: r }] = await Promise.all([
+    sb.from('reviews').select('*').eq('seller_id', USER.id).order('created_at', { ascending: false }),
+    sb.from('seller_ratings').select('*').eq('seller_id', USER.id).maybeSingle()]);
+  $('#pane').innerHTML = `<div class="kpis"><div class="kpi">Shop rating · تقييم المتجر<b>${r ? r.avg_rating + ' ★' : '—'}</b></div>
+    <div class="kpi">Reviews · عدد التقييمات<b>${r ? r.review_count : 0}</b></div></div>
+    <div class="note">Only buyers with a delivered order can review — every review is a verified purchase. After delivery, use "Ask for a review on WhatsApp" in Orders.<br>
+    <span class="ar">التقييم بيكون من عميلات استلموا طلبهم فعلاً. بعد التسليم ابعتي لينك التقييم من صفحة الطلبات.</span></div>
+    <div class="card">${reviewList(data)}</div>`;
 }
 boot();
 </script>

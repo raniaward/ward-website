@@ -58,14 +58,39 @@ function header(active) {
   h.innerHTML = `<a href="/"><img src="/logo.png" alt="WARD"></a>
   <nav>
     <a href="/market/" class="${active==='shop'?'on':''}">Shop · تسوّقي</a>
+    <a href="/market/order.html" class="${active==='order'?'on':''}">My order · طلبي</a>
     <a href="/market/seller.html" class="${active==='seller'?'on':''}">Sell on WARD · بيعي معنا</a>
     <a href="/market/cart.html" class="cartlink">Cart · السلة (<span id="cartCount">0</span>)</a>
   </nav>`;
   document.body.prepend(h);
+  // account bar: always shows who is logged in, with a clear log-out button
+  const bar = document.createElement('div'); bar.className = 'acct'; bar.id = 'acct';
+  h.after(bar);
+  sb.auth.getSession().then(({ data: { session } }) => {
+    if (!session) { bar.style.display = 'none'; return; }
+    bar.innerHTML = `Logged in as <b>${esc(session.user.email)}</b> · مسجّلة دخول
+      <button class="btn small ghost" onclick="logout()">Log out · خروج</button>`;
+  });
   const f = document.createElement('footer'); f.className = 'mk';
   f.innerHTML = `© 2026 WARD LLC · Sharjah Media City (Shams) · <a href="/terms.html">Terms</a> · <a href="/privacy.html">Privacy</a> · <a href="/conduct.html">Seller code</a>`;
   document.body.appendChild(f);
   Cart.badge();
+}
+
+async function logout() { await sb.auth.signOut(); location.href = '/market/seller.html'; }
+
+function stars(avg, n) {
+  if (!n) return '';
+  const full = Math.round(avg);
+  return `<span class="stars" title="${avg} / 5">${'★'.repeat(full)}${'☆'.repeat(5 - full)}</span> <span class="muted">${Number(avg).toFixed(1)} (${n})</span>`;
+}
+function revImg(path) { return path ? sb.storage.from('review-images').getPublicUrl(path).data.publicUrl : ''; }
+function reviewList(rows) {
+  if (!rows || !rows.length) return '<p class="muted">No reviews yet · لا توجد تقييمات بعد</p>';
+  return rows.map(r => `<div class="rev"><span class="stars">${'★'.repeat(r.rating)}${'☆'.repeat(5 - r.rating)}</span>
+    <b>${esc(r.buyer_name || 'Buyer')}</b> <span class="muted">· verified purchase · ${fmtDate(r.created_at)}</span>
+    ${r.comment ? `<p>${esc(r.comment)}</p>` : ''}
+    ${r.photos && r.photos.length ? `<div class="imgs">${r.photos.map(p => `<a href="${esc(revImg(p))}" target="_blank"><div style="background-image:url('${esc(revImg(p))}')"></div></a>`).join('')}</div>` : ''}</div>`).join('');
 }
 
 function tag(s) { return `<span class="tag ${esc(s)}">${esc(s)}</span>`; }

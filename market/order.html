@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>My order · طلبي — WARD</title>
+<meta name="robots" content="noindex">
+<link rel="icon" href="/favicon.png"><link rel="stylesheet" href="market.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.min.js"></script>
+<script src="ward.js"></script>
+</head>
+<body>
+<main class="wrap" style="max-width:760px">
+  <h1>My order <span class="ar">· طلبي</span></h1>
+  <p class="muted">Track your order, get your gift voucher codes and rate what you bought. · تابعي طلبك، خدي أكواد القسائم، وقيّمي مشترياتك.</p>
+  <form class="card" id="lf" style="margin-top:14px">
+    <div class="row"><div><label>Order number · رقم الطلب</label><input name="ref" required placeholder="W261125-XXXXX" style="text-transform:uppercase"></div>
+    <div><label>Mobile used for the order · الموبايل</label><input name="phone" required placeholder="+971…"></div></div>
+    <button class="btn">Show my order · اعرضي طلبي</button>
+  </form>
+  <div id="out"></div>
+</main>
+<script>
+header('order');
+const P = new URLSearchParams(location.search);
+$('input[name=ref]').value = P.get('ref') || '';
+try { $('input[name=phone]').value = localStorage.getItem('ward_phone') || ''; } catch {}
+let O = null, REF = '', PHONE = '';
+
+$('#lf').onsubmit = async e => { e.preventDefault(); const f = new FormData(e.target); REF = f.get('ref').trim(); PHONE = f.get('phone').trim(); load(); };
+async function load() {
+  const { data, error } = await sb.rpc('get_order', { p_ref: REF, p_phone: PHONE });
+  if (error || !data) { $('#out').innerHTML = `<p class="empty">We couldn't find that order. Check the number and the mobile you used. · مش لاقيين الطلب، راجعي الرقم والموبايل.</p>`; return; }
+  O = data; try { localStorage.setItem('ward_phone', PHONE); } catch {}
+  const steps = ['new','accepted','shipped','delivered'], idx = steps.indexOf(O.status);
+  $('#out').innerHTML = `<div class="card">
+    <div class="split"><b>Order ${esc(O.ref)}</b>${tag(O.status)}</div>
+    <p class="muted">${fmtDate(O.created_at)} · Shop: <a href="/market/?shop=${encodeURIComponent(O.shop.slug)}">${esc(O.shop.name)}</a>
+    · <a href="https://wa.me/${esc((O.shop.whatsapp || '').replace(/\D/g,''))}" target="_blank">WhatsApp the shop</a></p>
+    ${idx >= 0 ? `<div class="chips">${steps.map((s, i) => `<span class="chip ${i <= idx ? 'on' : ''}">${['Received · استلمنا','Confirmed · اتأكد','On the way · في الطريق','Delivered · اتسلّم'][i]}</span>`).join('')}</div>` : ''}
+    ${(O.items || []).map(i => `<div class="split"><span>${i.qty} × ${esc(i.title)}</span><span>${aed(i.price * i.qty)}</span></div>`).join('')}
+    ${O.voucher_applied > 0 ? `<div class="split"><span>Voucher</span><span>− ${aed(O.voucher_applied)}</span></div>` : ''}
+    <div class="split"><span>Delivery + fees</span><span>${aed(+O.delivery_fee + +O.handling_fee)}</span></div>
+    <div class="split"><b>Total · الإجمالي</b><b class="price">${aed(O.total_paid)}</b></div>
+    <p class="muted">Payment: ${esc(O.payment_method.toUpperCase())} · ${esc(O.payment_status)}</p></div>
+    ${(O.vouchers || []).length ? `<h2>Your gift vouchers · قسائمك</h2>${O.vouchers.map(v => `<div class="card">
+      ${v.code ? `<span class="code">${esc(v.code)}</span>` : '<span class="muted">Code appears once payment is confirmed · الكود بيظهر بعد تأكيد الدفع</span>'}
+      <div class="split" style="margin-top:8px"><span>Value · القيمة ${aed(v.value)} · Balance · الرصيد ${aed(v.balance)}</span>${tag(v.status)}</div>
+      <p class="muted">Spend at ${esc(O.shop.name)} only · valid until ${fmtDate(v.expires_at)}. Share the code as a gift — whoever has it can use it.</p></div>`).join('')}` : ''}
+    ${O.status === 'delivered' ? `<h2>Rate your items · قيّمي مشترياتك</h2>${(O.items || []).filter(i => i.kind !== 'voucher' && i.product_id).map(rateCard).join('')}` :
+      `<p class="note">You can rate your items once the order is delivered. · تقدري تقيّمي بعد الاستلام.</p>`}`;
+}
+
+const PICK = {}, PHOTOS = {};
+function rateCard(i) {
+  PICK[i.product_id] = i.review ? i.review.rating : 0; PHOTOS[i.product_id] = [];
+  return `<div class="card" id="rc${i.product_id}"><b>${esc(i.title)}</b>
+    <div class="starpick" id="sp${i.product_id}">${[1,2,3,4,5].map(n => `<button type="button" onclick="pick(${i.product_id},${n})">${n <= PICK[i.product_id] ? '★' : '☆'}</button>`).join('')}</div>
+    <textarea id="cm${i.product_id}" rows="2" maxlength="1000" placeholder="What did you like? · إيه اللي عجبك؟">${esc(i.review ? i.review.comment || '' : '')}</textarea>
+    <label>Photos (optional, up to 4) · صور</label><div class="imgs" id="ph${i.product_id}"></div>
+    <input type="file" accept="image/jpeg,image/png,image/webp" multiple onchange="addPhotos(${i.product_id},this)">
+    <button class="btn" onclick="send(${i.product_id})">${i.review ? 'Update review · تعديل' : 'Send review · إرسال التقييم'}</button></div>`;
+}
+function pick(id, n) { PICK[id] = n; $('#sp' + id).innerHTML = [1,2,3,4,5].map(k => `<button type="button" onclick="pick(${id},${k})">${k <= n ? '★' : '☆'}</button>`).join(''); }
+async function addPhotos(id, inp) {
+  for (const file of [...inp.files].slice(0, 4 - PHOTOS[id].length)) {
+    if (file.size > 5242880) { toast('Photo too large (max 5 MB)'); continue; }
+    const path = `r/${Date.now()}-${Math.random().toString(36).slice(2, 9)}.${(file.name.split('.').pop() || 'jpg').toLowerCase()}`;
+    const { error } = await sb.storage.from('review-images').upload(path, file, { contentType: file.type });
+    if (error) { toast(errMsg(error)); continue; }
+    PHOTOS[id].push(path);
+  }
+  inp.value = '';
+  $('#ph' + id).innerHTML = PHOTOS[id].map(p => `<div style="background-image:url('${esc(revImg(p))}')"></div>`).join('');
+}
+async function send(id) {
+  if (!PICK[id]) return toast('Choose 1 to 5 stars · اختاري النجوم');
+  const { error } = await sb.rpc('submit_review', { p_ref: REF, p_phone: PHONE, p_product_id: id, p_rating: PICK[id], p_comment: $('#cm' + id).value, p_photos: PHOTOS[id] });
+  if (error) return toast(errMsg(error));
+  toast('Thank you for your review! · شكراً على تقييمك 🌷'); load();
+}
+if (P.get('ref') && $('input[name=phone]').value) { REF = P.get('ref'); PHONE = $('input[name=phone]').value; load(); }
+</script>
+</body>
+</html>

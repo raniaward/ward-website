@@ -32,9 +32,9 @@ async function boot() {
 
 function draw() {
   $('#app').innerHTML = `<h1>WARD Admin</h1><p class="muted">${esc(USER.email)} · <a href="#" onclick="sb.auth.signOut().then(boot);return false">log out</a></p>
-  <div class="tabs">${[['sellers','Sellers · البائعات'],['orders','Orders · الطلبات'],['payouts','Payouts · التحويلات'],['money','WARD revenue · إيرادات وَرد'],['settings','Settings · الإعدادات']]
+  <div class="tabs">${[['sellers','Sellers · البائعات'],['orders','Orders · الطلبات'],['payouts','Payouts · التحويلات'],['reviews','Reviews · التقييمات'],['vouchers','Vouchers · القسائم'],['money','WARD revenue · إيرادات وَرد'],['settings','Settings · الإعدادات']]
     .map(([k, l]) => `<button class="${TAB===k?'on':''}" onclick="TAB='${k}';draw()">${l}</button>`).join('')}</div><div id="pane">Loading…</div>`;
-  ({ sellers, orders, payouts, money, settings })[TAB]();
+  ({ sellers, orders, payouts, reviews, vouchers, money, settings })[TAB]();
 }
 
 async function sellers() {
@@ -108,6 +108,26 @@ async function settings() {
     const { error } = await sb.from('ward_settings').update(f).eq('id', 1); toast(error ? errMsg(error) : 'Saved'); };
 }
 async function rate(k, v) { const { error } = await sb.from('commission_rates').update({ rate: +v }).eq('key', k); toast(error ? errMsg(error) : 'Rate saved'); RATES = []; await loadRates(); }
+async function reviews() {
+  const { data } = await sb.from('reviews').select('*,sellers(shop_name)').order('created_at', { ascending: false }).limit(300);
+  $('#pane').innerHTML = `<div class="note">Hide reviews that are abusive or break the rules. Hidden reviews stop counting in ratings.</div>
+  <div style="overflow-x:auto"><table><tr><th>Shop</th><th>Rating</th><th>Review</th><th>Status</th><th></th></tr>
+  ${(data || []).map(r => `<tr><td>${esc(r.sellers?.shop_name)}<br><span class="muted">${fmtDate(r.created_at)}</span></td><td>${'★'.repeat(r.rating)}</td>
+    <td>${esc(r.buyer_name)}: ${esc(r.comment || '')} ${r.photos.length ? `<div class="imgs">${r.photos.map(p => `<a href="${esc(revImg(p))}" target="_blank"><div style="background-image:url('${esc(revImg(p))}')"></div></a>`).join('')}</div>` : ''}</td>
+    <td>${tag(r.status)}</td><td><button class="btn small ghost" onclick="revSt(${r.id},'${r.status === 'published' ? 'hidden' : 'published'}')">${r.status === 'published' ? 'Hide' : 'Show'}</button></td></tr>`).join('')}
+  </table></div>${(data || []).length ? '' : '<p class="muted">No reviews yet.</p>'}`;
+}
+async function revSt(id, s) { const { error } = await sb.from('reviews').update({ status: s }).eq('id', id); toast(error ? errMsg(error) : 'Updated'); reviews(); }
+
+async function vouchers() {
+  const { data } = await sb.from('vouchers').select('*,sellers(shop_name)').order('created_at', { ascending: false }).limit(500);
+  $('#pane').innerHTML = `<div class="note">Each voucher belongs to one shop. Codes activate automatically when the voucher order is marked delivered or paid.</div>
+  <div style="overflow-x:auto"><table><tr><th>Code</th><th>Shop</th><th>Value</th><th>Balance</th><th>Status</th><th>Expires</th><th></th></tr>
+  ${(data || []).map(v => `<tr><td>${esc(v.code)}</td><td>${esc(v.sellers?.shop_name)}</td><td>${aed(v.value)}</td><td>${aed(v.balance)}</td><td>${tag(v.status)}</td><td>${fmtDate(v.expires_at)}</td>
+    <td>${['pending','active'].includes(v.status) ? `<button class="btn small ghost" onclick="voidV('${esc(v.code)}')">Void</button>` : ''}</td></tr>`).join('')}
+  </table></div>${(data || []).length ? '' : '<p class="muted">No vouchers yet.</p>'}`;
+}
+async function voidV(c) { if (!confirm('Void this voucher?')) return; const { error } = await sb.from('vouchers').update({ status: 'void' }).eq('code', c); toast(error ? errMsg(error) : 'Voided'); vouchers(); }
 boot();
 </script>
 </body>

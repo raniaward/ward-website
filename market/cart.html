@@ -29,6 +29,10 @@
         <label style="font-weight:normal"><input type="radio" name="pay" value="cod" checked style="width:auto;margin:0 6px"> Cash on delivery · الدفع عند الاستلام <span class="muted" id="codFee"></span></label>
         <label style="font-weight:normal;opacity:.55"><input type="radio" name="pay" value="card" disabled style="width:auto;margin:0 6px"> Card — coming soon · الدفع بالكارت قريباً</label>
       </div>
+      <label>Gift voucher code (optional) · كود قسيمة</label>
+      <div style="display:flex;gap:8px;align-items:center"><input id="vcode" placeholder="WV-XXXXXXXX" style="max-width:220px;text-transform:uppercase">
+      <button type="button" class="btn small ghost" onclick="applyVoucher()">Apply · تطبيق</button></div>
+      <p class="muted" id="vmsg" style="margin:-6px 0 10px"></p>
       <div class="card" style="background:var(--cream)" id="sum"></div>
       <label style="font-weight:normal;font-size:13.5px"><input type="checkbox" required style="width:auto;margin:0 6px"> I agree to the <a href="/terms.html" target="_blank">WARD Conditions of Use</a> and <a href="/privacy.html" target="_blank">Privacy Notice</a>. · أوافق على الشروط وسياسة الخصوصية.</label>
       <br><button class="btn" id="placeBtn">Place order · أكّدي الطلب</button>
@@ -48,10 +52,10 @@ async function init() {
   $('#codFee').textContent = `(+${aed(S.cod_fee)} per shop)`;
   const cart = Cart.get();
   if (!cart.length) { $('#items').innerHTML = `<div class="empty"><p>Your cart is empty · السلة فاضية</p><p style="margin-top:12px"><a class="btn" href="/market/">Go shopping · تسوّقي</a></p></div>`; return; }
-  const { data } = await sb.from('products').select('id,title,price,stock,images,seller_id,sellers(shop_name)').in('id', cart.map(i => i.id));
+  const { data } = await sb.from('products').select('id,title,price,stock,images,kind,seller_id,sellers(shop_name)').in('id', cart.map(i => i.id));
   PRODS = data || [];
   // drop items no longer available
-  Cart.set(cart.filter(i => PRODS.some(p => p.id === i.id && p.stock > 0)));
+  Cart.set(cart.filter(i => PRODS.some(p => p.id === i.id && (p.kind === 'voucher' || p.stock > 0))));
   draw();
 }
 
@@ -63,21 +67,36 @@ function draw() {
   $('#items').innerHTML = Object.values(shops).map(s => `<div class="card"><b>${esc(s.name)}</b>
     ${s.rows.map(r => `<div class="split" style="align-items:center;border-top:1px solid #eee;margin-top:8px;padding-top:8px">
       <span>${esc(r.p.title)}<br><span class="muted">${aed(r.p.price)}</span></span>
-      <span><input type="number" min="1" max="${r.p.stock}" value="${r.qty}" style="width:70px;margin:0" onchange="setQty(${r.p.id},this.value)">
+      <span>${r.p.kind === 'voucher' ? '<span class="vbadge">🎁 voucher</span> ' : ''}<input type="number" min="1" max="${r.p.kind === 'voucher' ? 10 : r.p.stock}" value="${r.qty}" style="width:70px;margin:0" onchange="setQty(${r.p.id},this.value)">
       <button class="btn small ghost" onclick="setQty(${r.p.id},0)">Remove</button></span></div>`).join('')}</div>`).join('');
   $('#checkout').style.display = 'block';
   summary();
 }
 function setQty(id, q) {
-  const p = PRODS.find(x => x.id === id); q = Math.min(parseInt(q) || 0, p ? p.stock : 0);
+  const p = PRODS.find(x => x.id === id); q = Math.min(parseInt(q) || 0, p ? (p.kind === 'voucher' ? 10 : p.stock) : 0);
   Cart.set(Cart.get().map(i => i.id === id ? { ...i, qty: q } : i).filter(i => i.qty > 0)); draw();
 }
+let VOUCHER = null;
+async function applyVoucher() {
+  const c = $('#vcode').value.trim().toUpperCase(); VOUCHER = null;
+  if (!c) { $('#vmsg').textContent = ''; return summary(); }
+  const { data } = await sb.rpc('check_voucher', { p_code: c });
+  if (!data || data.status !== 'active' || data.balance <= 0 || data.expires_at < new Date().toISOString().slice(0,10)) {
+    $('#vmsg').textContent = 'This code is not valid or already used. · الكود غير صالح.'; return summary(); }
+  if (!PRODS.some(p => p.seller_id === data.seller_id && Cart.get().some(i => i.id === p.id))) {
+    $('#vmsg').textContent = `This voucher is for ${data.shop} only — add items from that shop. · القسيمة دي لمتجر ${data.shop} بس.`; return summary(); }
+  VOUCHER = data; $('#vmsg').textContent = `✓ ${data.shop} voucher — balance ${aed(data.balance)}`; summary();
+}
 function summary() {
-  const cart = Cart.get(); let items = 0; const sellers = new Set();
-  cart.forEach(i => { const p = PRODS.find(x => x.id === i.id); if (p) { items += p.price * i.qty; sellers.add(p.seller_id); } });
-  const n = sellers.size, del = S.delivery_fee * n, cod = S.cod_fee * n;
+  const cart = Cart.get(); let items = 0, vdisc = 0; const sellers = new Set(), phys = {};
+  cart.forEach(i => { const p = PRODS.find(x => x.id === i.id); if (p) { items += p.price * i.qty; sellers.add(p.seller_id);
+    if (p.kind !== 'voucher') phys[p.seller_id] = (phys[p.seller_id] || 0) + p.price * i.qty; } });
+  if (VOUCHER) vdisc = Math.min(VOUCHER.balance, phys[VOUCHER.seller_id] || 0);
+  const n = sellers.size, del = S.delivery_fee * Object.keys(phys).length, cod = S.cod_fee * n;
+  items -= vdisc;
   $('#sum').innerHTML = `<div class="split"><span>Items · المنتجات</span><b>${aed(items)}</b></div>
-    <div class="split"><span>Delivery · التوصيل (${n} shop${n > 1 ? 's' : ''})</span><b>${aed(del)}</b></div>
+    ${vdisc ? `<div class="split"><span>Voucher · القسيمة</span><b>− ${aed(vdisc)}</b></div>` : ''}
+    <div class="split"><span>Delivery · التوصيل</span><b>${aed(del)}</b></div>
     <div class="split"><span>Cash-on-delivery fee · رسوم الدفع عند الاستلام</span><b>${aed(cod)}</b></div>
     <div class="split" style="border-top:1px solid var(--line);margin-top:6px;padding-top:8px;font-size:17px"><span>Total · الإجمالي</span><b class="price">${aed(items + del + cod)}</b></div>
     <p class="muted" style="margin-top:6px">Each shop sends its own delivery. Final total is confirmed on your order. · كل متجر بيوصّل طلبه.</p>`;
@@ -90,16 +109,18 @@ $('#cf').onsubmit = async e => {
   const { data, error } = await sb.rpc('place_order', {
     p_items: Cart.get().map(i => ({ product_id: i.id, qty: i.qty })),
     p_name: f.get('name'), p_phone: f.get('phone'), p_email: f.get('email') || null,
-    p_address: f.get('address'), p_emirate: f.get('emirate'), p_payment: f.get('pay'), p_notes: f.get('notes') || null
+    p_address: f.get('address'), p_emirate: f.get('emirate'), p_payment: f.get('pay'), p_notes: f.get('notes') || null, p_voucher: VOUCHER ? VOUCHER.code : null
   });
   if (error) { toast(errMsg(error)); b.disabled = false; b.textContent = 'Place order · أكّدي الطلب'; return; }
+  try { localStorage.setItem('ward_phone', f.get('phone')); } catch {}
   Cart.set([]);
   $('#items').style.display = 'none'; $('#checkout').style.display = 'none';
   $('#done').style.display = 'block';
   $('#done').innerHTML = `<h2 style="margin-top:0">Thank you! · شكراً ليكي 🌷</h2>
     <p>Your order is placed. Each shop will contact you on WhatsApp to confirm delivery.</p>
     <p class="ar">طلبك وصل. كل متجر هيكلمك على واتساب لتأكيد التوصيل.</p>
-    ${data.map(o => `<div class="split"><span>Order <b>${esc(o.ref)}</b></span><b>${aed(o.total)}</b></div>`).join('')}
+    ${data.map(o => `<div class="split"><span>Order <b>${esc(o.ref)}</b> · <a href="/market/order.html?ref=${encodeURIComponent(o.ref)}">track · تابعي</a></span><b>${aed(o.total)}</b></div>`).join('')}
+    <p class="muted">Gift vouchers: your codes appear on the order page once payment is confirmed. · أكواد القسائم بتظهر في صفحة الطلب بعد تأكيد الدفع.</p>
     <p class="muted" style="margin-top:8px">Pay cash on delivery. Keep your order number. · احتفظي برقم الطلب.</p>
     <p style="margin-top:14px"><a class="btn" href="/market/">Back to shop · رجوع للسوق</a></p>`;
 };
