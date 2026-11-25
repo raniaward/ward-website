@@ -54,6 +54,13 @@ async function init() {
   if (!cart.length) { $('#items').innerHTML = `<div class="empty"><p>Your cart is empty · السلة فاضية</p><p style="margin-top:12px"><a class="btn" href="/market/">Go shopping · تسوّقي</a></p></div>`; return; }
   const { data } = await sb.from('products').select('id,title,price,stock,images,kind,seller_id,sellers(shop_name)').in('id', cart.map(i => i.id));
   PRODS = data || [];
+  // gift vouchers offered by the shops in this cart ("support this shop")
+  const sids = [...new Set(PRODS.map(p => p.seller_id))];
+  if (sids.length) {
+    const { data: vs } = await sb.from('products').select('id,title,price,stock,images,kind,seller_id,sellers(shop_name)')
+      .eq('kind', 'voucher').eq('status', 'active').in('seller_id', sids).order('price');
+    (vs || []).forEach(v => { if (!PRODS.some(p => p.id === v.id)) PRODS.push(v); });
+  }
   // drop items no longer available
   Cart.set(cart.filter(i => PRODS.some(p => p.id === i.id && (p.kind === 'voucher' || p.stock > 0))));
   draw();
@@ -63,15 +70,21 @@ function draw() {
   const cart = Cart.get();
   if (!cart.length) { $('#items').innerHTML = `<div class="empty">Your cart is empty · السلة فاضية — <a href="/market/">shop</a></div>`; $('#checkout').style.display = 'none'; return; }
   const shops = {};
-  cart.forEach(i => { const p = PRODS.find(x => x.id === i.id); if (p) (shops[p.seller_id] = shops[p.seller_id] || { name: p.sellers.shop_name, rows: [] }).rows.push({ p, qty: i.qty }); });
+  cart.forEach(i => { const p = PRODS.find(x => x.id === i.id); if (p) (shops[p.seller_id] = shops[p.seller_id] || { id: p.seller_id, name: p.sellers.shop_name, rows: [] }).rows.push({ p, qty: i.qty }); });
+  const support = s => { const vs = PRODS.filter(p => p.kind === 'voucher' && p.seller_id === s.id);
+    if (!vs.length) return '';
+    return `<div class="note" style="margin-top:12px">🌷 <b>Support ${esc(s.name)}</b> — add a gift voucher for someone you love, spent at this shop only.<br>
+      <span class="ar">ادعمي ${esc(s.name)} — ضيفي قسيمة هدية لحد بتحبيه، تتصرف في المتجر ده بس.</span>
+      <div style="margin-top:8px">${vs.map(v => `<button class="btn small" onclick="addV(${v.id})">+ ${aed(v.price)} voucher</button>`).join(' ')}</div></div>`; };
   $('#items').innerHTML = Object.values(shops).map(s => `<div class="card"><b>${esc(s.name)}</b>
     ${s.rows.map(r => `<div class="split" style="align-items:center;border-top:1px solid #eee;margin-top:8px;padding-top:8px">
       <span>${esc(r.p.title)}<br><span class="muted">${aed(r.p.price)}</span></span>
       <span>${r.p.kind === 'voucher' ? '<span class="vbadge">🎁 voucher</span> ' : ''}<input type="number" min="1" max="${r.p.kind === 'voucher' ? 10 : r.p.stock}" value="${r.qty}" style="width:70px;margin:0" onchange="setQty(${r.p.id},this.value)">
-      <button class="btn small ghost" onclick="setQty(${r.p.id},0)">Remove</button></span></div>`).join('')}</div>`).join('');
+      <button class="btn small ghost" onclick="setQty(${r.p.id},0)">Remove</button></span></div>`).join('')}${support(s)}</div>`).join('');
   $('#checkout').style.display = 'block';
   summary();
 }
+function addV(id) { Cart.add(id, 1); toast('Gift voucher added 🎁 · اتضافت القسيمة'); draw(); }
 function setQty(id, q) {
   const p = PRODS.find(x => x.id === id); q = Math.min(parseInt(q) || 0, p ? (p.kind === 'voucher' ? 10 : p.stock) : 0);
   Cart.set(Cart.get().map(i => i.id === id ? { ...i, qty: q } : i).filter(i => i.qty > 0)); draw();

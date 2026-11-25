@@ -55,6 +55,7 @@ async function shopHeader() {
     <div>${stars(r.avg_rating, r.review_count) || '<span class="muted">New shop · متجر جديد</span>'} · <span class="muted">${esc(s.emirate || '')}</span>
     ${s.instagram ? ` · <a href="https://instagram.com/${encodeURIComponent(s.instagram.replace('@',''))}" target="_blank">${esc(s.instagram)}</a>` : ''}</div></div></div>
     ${s.bio ? `<p style="margin:12px 0;white-space:pre-line">${esc(s.bio)}</p>` : ''}
+    ${ALL.some(x => x.kind === 'voucher') ? `<p><button class="btn" onclick="giftFrom('${s.id}')">🎁 Support this shop — buy a gift voucher · ادعمي المتجر بقسيمة</button></p>` : ''}
     <p class="muted"><a href="/market/">← All shops · كل المتاجر</a></p>`;
   const { data: rv } = await sb.from('reviews').select('*').eq('seller_id', s.id).eq('status', 'published').order('created_at', { ascending: false }).limit(30);
   $('#shopReviews').innerHTML = `<h2>Reviews · التقييمات</h2><div class="card">${reviewList(rv)}</div>`;
@@ -92,6 +93,7 @@ async function openPM(id) {
       <p><a href="?shop=${encodeURIComponent(p.sellers.slug)}">${esc(p.sellers.shop_name)}</a> · <span class="muted">${esc(p.sellers.emirate || '')}</span></p>
       <div>${stars(r.avg_rating, r.review_count)}</div>
       <p class="price" style="font-size:22px;margin:10px 0">${aed(p.price)}</p>
+      ${!isV && ALL.some(x => x.kind === 'voucher' && x.seller_id === p.seller_id) ? `<p><a href="#" onclick="giftFrom('${p.seller_id}');return false">🌷 Support this shop — gift a voucher · ادعمي المتجر بقسيمة هدية</a></p>` : ''}
       ${isV ? `<div class="note">This voucher can be spent only at <b>${esc(p.sellers.shop_name)}</b> on WARD, within 12 months. You get the code once payment is confirmed.<br>
         <span class="ar">القسيمة دي تتصرف في متجر ${esc(p.sellers.shop_name)} بس، خلال 12 شهر. الكود بيوصلك بعد تأكيد الدفع.</span></div>` : `<p class="muted">${esc(catName(p.category))}</p>`}
       <p style="white-space:pre-line;margin:12px 0">${esc(p.description || '')}</p>
@@ -103,6 +105,7 @@ async function openPM(id) {
   const { data } = await sb.from('reviews').select('*').eq('product_id', id).eq('status', 'published').order('created_at', { ascending: false }).limit(20);
   $('#pmRev').innerHTML = reviewList(data);
 }
+function giftFrom(sid) { const v = ALL.find(x => x.kind === 'voucher' && x.seller_id === sid); if (v) openPM(v.id); }
 function closePM() { $('#pm').classList.remove('open'); }
 $('#pm').onclick = e => { if (e.target.id === 'pm') closePM(); };
 function addCart(id) {
