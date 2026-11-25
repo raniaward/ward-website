@@ -4,9 +4,9 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>WARD Shop · سوق وَرد</title>
 <meta name="description" content="Shop products and Growth Vouchers from women-owned businesses across the UAE.">
-<link rel="icon" href="/favicon.png"><link rel="stylesheet" href="market.css?v=10">
+<link rel="icon" href="/favicon.png"><link rel="stylesheet" href="market.css?v=11">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.min.js"></script>
-<script src="ward.js?v=10"></script>
+<script src="ward.js?v=11"></script>
 </head>
 <body>
 <main class="wrap">
@@ -52,7 +52,7 @@ async function shopHeader() {
   const { data: s } = await sb.from('sellers').select('id,shop_name,slug,bio,emirate,instagram,logo_url,cover_url,category').eq('slug', SELLER).maybeSingle();
   if (!s) return;
   const r = SR[s.id] || {};
-  $('#shopHead').innerHTML = `<div class="cover" style="background-image:url('${esc(imgUrl(s.cover_url))}')"></div>
+  $('#shopHead').innerHTML = `<div class="cover" ${s.cover_url ? `style="background-image:url('${esc(imgUrl(s.cover_url))}')"` : ''}></div>
     <div class="shophead"><div class="logo" style="background-image:url('${esc(imgUrl(s.logo_url))}')"></div>
     <div style="padding-top:34px"><h1 style="margin:0">${esc(s.shop_name)}</h1>
     <div>${stars(r.avg_rating, r.review_count) || '<span class="muted">New shop · متجر جديد</span>'} · <span class="muted">${esc(s.emirate || '')}</span>

@@ -4,9 +4,9 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>My order · طلبي — WARD</title>
 <meta name="robots" content="noindex">
-<link rel="icon" href="/favicon.png"><link rel="stylesheet" href="market.css?v=10">
+<link rel="icon" href="/favicon.png"><link rel="stylesheet" href="market.css?v=11">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.min.js"></script>
-<script src="ward.js?v=10"></script>
+<script src="ward.js?v=11"></script>
 </head>
 <body>
 <main class="wrap" style="max-width:760px">
@@ -36,7 +36,7 @@ async function load() {
     <div class="split"><b>Order ${esc(O.ref)}</b>${tag(O.status)}</div>
     <p class="muted">${fmtDate(O.created_at)} · Shop: <a href="/market/?shop=${encodeURIComponent(O.shop.slug)}">${esc(O.shop.name)}</a>
     · <a href="https://wa.me/${esc((O.shop.whatsapp || '').replace(/\D/g,''))}" target="_blank">WhatsApp the shop</a></p>
-    ${idx >= 0 ? `<div class="chips">${steps.map((s, i) => `<span class="chip ${i <= idx ? 'on' : ''}">${['Received · استلمنا','Confirmed · اتأكد','On the way · في الطريق','Delivered · اتسلّم'][i]}</span>`).join('')}</div>` : ''}
+    ${idx >= 0 && !(O.items || []).every(i => i.kind === 'voucher') ? `<div class="chips">${steps.map((s, i) => `<span class="chip ${i <= idx ? 'on' : ''}">${['Received · استلمنا','Confirmed · اتأكد','On the way · في الطريق','Delivered · اتسلّم'][i]}</span>`).join('')}</div>` : ''}
     ${(O.items || []).map(i => `<div class="split"><span>${i.qty} × ${esc(i.title)}</span><span>${aed(i.price * i.qty)}</span></div>`).join('')}
     ${O.voucher_applied > 0 ? `<div class="split"><span>Voucher</span><span>− ${aed(O.voucher_applied)}</span></div>` : ''}
     <div class="split"><span>Delivery + fees</span><span>${aed(+O.delivery_fee + +O.handling_fee)}</span></div>
@@ -48,7 +48,7 @@ async function load() {
       <p class="muted">Spend at ${esc(O.shop.name)} only · <b>from ${fmtDate(v.redeem_from)}</b> until ${fmtDate(v.expires_at)} · تتصرف من ${fmtDate(v.redeem_from)}. Share the code as a gift — whoever has it can use it.</p></div>`).join('')}` : ''}
     ${(O.items || []).length && O.items.every(i => i.kind === 'voucher') && !['cancelled','refunded'].includes(O.status) && (Date.now() - new Date(O.created_at)) < 14 * 864e5 && (O.vouchers || []).every(v => +v.balance === +v.value) ?
       `<p><button class="btn small ghost" onclick="cancelV()">Cancel this voucher order (within 14 days) · إلغاء القسيمة خلال 14 يوم</button></p>` : ''}
-    ${O.status === 'delivered' ? `<h2>Rate your items · قيّمي مشترياتك</h2>${(O.items || []).filter(i => i.kind !== 'voucher' && i.product_id).map(rateCard).join('')}` :
+    ${!(O.items || []).some(i => i.kind !== 'voucher') ? '' : O.status === 'delivered' ? `<h2>Rate your items · قيّمي مشترياتك</h2>${(O.items || []).filter(i => i.kind !== 'voucher' && i.product_id).map(rateCard).join('')}` :
       `<p class="note">You can rate your items once the order is delivered. · تقدري تقيّمي بعد الاستلام.</p>`}`;
 }
 
