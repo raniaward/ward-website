@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>WARD Shop · سوق وَرد</title>
-<meta name="description" content="Shop products and Growth Vouchers from women-owned businesses across the UAE.">
-<link rel="icon" href="/favicon.png"><link rel="stylesheet" href="market.css?v=11">
+<meta name="description" content="Shop products and Advance Purchase Vouchers from women-owned businesses across the UAE.">
+<link rel="canonical" href="https://wardworld.org/market/"><link rel="icon" href="/favicon.png"><link rel="stylesheet" href="market.css?v=11">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.min.js"></script>
 <script src="ward.js?v=11"></script>
 </head>
@@ -12,7 +12,7 @@
 <main class="wrap">
   <div id="shopHead">
     <h1>WARD Shop <span class="ar">· سوق وَرد</span></h1>
-    <p class="muted">Products and Growth Vouchers from women-owned businesses in the UAE. <span class="ar">منتجات وقسائم نمو من مشاريع نسائية في الإمارات.</span></p>
+    <p class="muted">Products and Advance Purchase Vouchers from women-owned businesses in the UAE. <span class="ar">منتجات وقسائم شراء مسبق من مشاريع نسائية في الإمارات.</span></p>
   </div>
   <input id="q" placeholder="Search · ابحثي عن منتج" style="max-width:420px;margin-top:14px">
   <div class="chips" id="chips"></div>
@@ -30,7 +30,7 @@ let ALL = [], SHOPS = [], CAT = '', PR = {}, SR = {}, SELLER = new URLSearchPara
 async function init() {
   await loadRates();
   $('#chips').innerHTML = `<button class="chip on" data-c="">All · الكل</button>
-    <button class="chip" data-c="voucher">🌱 Growth Vouchers · قسائم النمو</button>` +
+    <button class="chip" data-c="voucher">🌱 Advance Purchase Vouchers · قسائم الشراء المسبق</button>` +
     RATES.map(r => `<button class="chip" data-c="${r.key}">${esc(r.name_en)} · ${esc(r.name_ar)}</button>`).join('');
   $$('#chips .chip').forEach(b => b.onclick = () => { CAT = b.dataset.c; $$('#chips .chip').forEach(x => x.classList.toggle('on', x === b)); render(); });
 
@@ -58,7 +58,7 @@ async function shopHeader() {
     <div>${stars(r.avg_rating, r.review_count) || '<span class="muted">New shop · متجر جديد</span>'} · <span class="muted">${esc(s.emirate || '')}</span>
     ${s.instagram ? ` · <a href="https://instagram.com/${encodeURIComponent(s.instagram.replace('@',''))}" target="_blank">${esc(s.instagram)}</a>` : ''}</div></div></div>
     ${s.bio ? `<p style="margin:12px 0;white-space:pre-line">${esc(s.bio)}</p>` : ''}
-    ${ALL.some(x => x.kind === 'voucher') ? `<p><button class="btn" onclick="giftFrom('${s.id}')">🌱 Grow with this shop — Growth Voucher · انمي مع المتجر — قسيمة نمو</button></p>` : ''}
+    ${ALL.some(x => x.kind === 'voucher') ? `<p><button class="btn" onclick="giftFrom('${s.id}')">🌱 Grow with this shop — Advance Purchase Voucher · انمي مع المتجر — قسيمة شراء مسبق</button></p>` : ''}
     <p class="muted"><a href="/market/">← All shops · كل المتاجر</a></p>`;
   const { data: rv } = await sb.from('reviews').select('*').eq('seller_id', s.id).eq('status', 'published').order('created_at', { ascending: false }).limit(30);
   $('#shopReviews').innerHTML = `<h2>Reviews · التقييمات</h2><div class="card">${reviewList(rv)}</div>`;
@@ -89,7 +89,7 @@ function render() {
   }
   $('#grid').innerHTML = list.map(p => { const r = PR[p.id] || {}; return `<div class="prod" onclick="openPM(${p.id})">
     <div class="ph" style="background-image:url('${esc(imgUrl(p.images[0]))}')"></div>
-    <div class="in">${p.kind === 'voucher' ? '<span class="vbadge">🌱 Growth Voucher</span>' : ''}<b>${esc(p.title)}</b>
+    <div class="in">${p.kind === 'voucher' ? '<span class="vbadge">🌱 Advance Purchase Voucher</span>' : ''}<b>${esc(p.title)}</b>
     <span class="muted">${esc(p.sellers.shop_name)}</span><br><span class="price">${aed(p.price)}</span>
     ${p.kind !== 'voucher' && p.stock < 1 ? ' <span class="tag cancelled">sold out</span>' : ''}
     <div>${stars(r.avg_rating, r.review_count)}</div></div></div>`; }).join('');
@@ -103,15 +103,15 @@ async function openPM(id) {
   $('#pmBody').innerHTML = `<div class="pd">
     <div><div class="main" id="mainImg" style="background-image:url('${esc(imgUrl(imgs[0]))}')"></div>
       <div class="thumbs">${imgs.map(i => `<div style="background-image:url('${esc(imgUrl(i))}')" onclick="$('#mainImg').style.backgroundImage='url(${esc(imgUrl(i))})'"></div>`).join('')}</div></div>
-    <div>${isV ? '<span class="vbadge">🌱 Growth Voucher · قسيمة نمو</span>' : ''}
+    <div>${isV ? '<span class="vbadge">🌱 Advance Purchase Voucher · قسيمة شراء مسبق</span>' : ''}
       <h2 style="margin-top:4px">${esc(p.title)}</h2>
       <p><a href="?shop=${encodeURIComponent(p.sellers.slug)}">${esc(p.sellers.shop_name)}</a> · <span class="muted">${esc(p.sellers.emirate || '')}</span></p>
       <div>${stars(r.avg_rating, r.review_count)}</div>
       <p class="price" style="font-size:22px;margin:10px 0">${aed(p.price)}</p>
-      ${!isV && ALL.some(x => x.kind === 'voucher' && x.seller_id === p.seller_id) ? `<p><a href="#" onclick="giftFrom('${p.seller_id}');return false">🌱 Grow with this shop — Growth Voucher · انمي مع المتجر</a></p>` : ''}
+      ${!isV && ALL.some(x => x.kind === 'voucher' && x.seller_id === p.seller_id) ? `<p><a href="#" onclick="giftFrom('${p.seller_id}');return false">🌱 Grow with this shop — Advance Purchase Voucher · انمي مع المتجر</a></p>` : ''}
       ${isV ? `<div class="note">${+p.voucher_value > +p.price ? `<b>Pay ${aed(p.price)} now — after one year, get products worth ${aed(p.voucher_value)} from this shop.</b><br>` : ''}
-        A Growth Voucher gives <b>${esc(p.sellers.shop_name)}</b> working capital today. It is redeemed for <b>products from this shop only</b> (never cash), starting <b>one year after purchase</b> and for the 12 months after that. Your code appears once payment is confirmed. It is a prepaid shop voucher, not an investment.<br>
-        <span class="ar">${+p.voucher_value > +p.price ? `ادفعي ${p.price} درهم دلوقتي — وبعد سنة خدي منتجات بقيمة ${p.voucher_value} درهم من المتجر. ` : ''}قسيمة النمو بتدّي المتجر رأس مال دلوقتي، وبتتصرف منتجات بس من نفس المتجر (مش فلوس)، بعد سنة من الشراء وخلال الـ12 شهر اللي بعدها.</span></div>` : `<p class="muted">${esc(catName(p.category))}</p>`}
+        A Advance Purchase Voucher gives <b>${esc(p.sellers.shop_name)}</b> working capital today. It is redeemed for <b>products from this shop only</b> (never cash), starting <b>one year after purchase</b> and for the 12 months after that. Your code appears once payment is confirmed. It is a prepaid shop voucher, not an investment.<br>
+        <span class="ar">${+p.voucher_value > +p.price ? `ادفعي ${p.price} درهم دلوقتي — وبعد سنة خدي منتجات بقيمة ${p.voucher_value} درهم من المتجر. ` : ''}قسيمة الشراء المسبق بتدّي المتجر رأس مال دلوقتي، وبتتصرف منتجات بس من نفس المتجر (مش فلوس)، بعد سنة من الشراء وخلال الـ12 شهر اللي بعدها.</span></div>` : `<p class="muted">${esc(catName(p.category))}</p>`}
       <p style="white-space:pre-line;margin:12px 0">${esc(p.description || '')}</p>
       ${avail ? `<label>Quantity · الكمية</label><input type="number" id="qty" min="1" max="${isV ? 10 : p.stock}" value="1" style="max-width:110px">
       <br><button class="btn" onclick="addCart(${p.id})">Add to cart · أضيفي للسلة</button>` : '<p><span class="tag cancelled">Sold out · نفدت الكمية</span></p>'}

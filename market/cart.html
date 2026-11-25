@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Cart · السلة — WARD</title>
-<link rel="icon" href="/favicon.png"><link rel="stylesheet" href="market.css?v=11">
+<meta name="robots" content="noindex"><link rel="icon" href="/favicon.png"><link rel="stylesheet" href="market.css?v=11">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.min.js"></script>
 <script src="ward.js?v=11"></script>
 </head>
@@ -84,7 +84,7 @@ function draw() {
   $('#checkout').style.display = 'block';
   summary();
 }
-function addV(id) { Cart.add(id, 1); toast('Growth Voucher added 🌱 · اتضافت قسيمة النمو'); draw(); }
+function addV(id) { Cart.add(id, 1); toast('Advance Purchase Voucher added 🌱 · اتضافت قسيمة الشراء المسبق'); draw(); }
 function setQty(id, q) {
   const p = PRODS.find(x => x.id === id); q = Math.min(parseInt(q) || 0, p ? (p.kind === 'voucher' ? 10 : p.stock) : 0);
   Cart.set(Cart.get().map(i => i.id === id ? { ...i, qty: q } : i).filter(i => i.qty > 0)); draw();
@@ -97,7 +97,7 @@ async function applyVoucher() {
   if (!data || data.status !== 'active' || data.balance <= 0 || data.expires_at < new Date().toISOString().slice(0,10)) {
     $('#vmsg').textContent = 'This code is not valid or already used. · الكود غير صالح.'; return summary(); }
   if (data.redeem_from > new Date().toISOString().slice(0,10)) {
-    $('#vmsg').textContent = `This Growth Voucher can be used from ${fmtDate(data.redeem_from)}. · القسيمة تتصرف من ${fmtDate(data.redeem_from)}.`; return summary(); }
+    $('#vmsg').textContent = `This Advance Purchase Voucher can be used from ${fmtDate(data.redeem_from)}. · القسيمة تتصرف من ${fmtDate(data.redeem_from)}.`; return summary(); }
   if (!PRODS.some(p => p.seller_id === data.seller_id && Cart.get().some(i => i.id === p.id))) {
     $('#vmsg').textContent = `This voucher is for ${data.shop} only — add items from that shop. · القسيمة دي لمتجر ${data.shop} بس.`; return summary(); }
   VOUCHER = data; $('#vmsg').textContent = `✓ ${data.shop} voucher — balance ${aed(data.balance)}`; summary();
@@ -117,7 +117,7 @@ function summary() {
     <div class="split"><span>Delivery · التوصيل</span><b>${aed(del)}</b></div>
     <div class="split"><span>Cash-on-delivery fee · رسوم الدفع عند الاستلام</span><b>${aed(cod)}</b></div>
     <div class="split" style="border-top:1px solid var(--line);margin-top:6px;padding-top:8px;font-size:17px"><span>Total · الإجمالي</span><b class="price">${aed(items + del + cod)}</b></div>
-    <p class="muted" style="margin-top:6px">${needAddr ? 'Each shop sends its own delivery. · كل متجر بيوصّل طلبه.' : 'Growth Vouchers only — no delivery needed. · قسائم بس، مفيش توصيل.'}</p>`;
+    <p class="muted" style="margin-top:6px">${needAddr ? 'Each shop sends its own delivery. · كل متجر بيوصّل طلبه.' : 'Advance Purchase Vouchers only — no delivery needed. · قسائم بس، مفيش توصيل.'}</p>`;
 }
 
 $('#cf').onsubmit = async e => {
@@ -146,7 +146,7 @@ $('#cf').onsubmit = async e => {
     ${data.map(o => `<div class="card" style="background:var(--cream)"><div class="split"><span>Order <b>${esc(o.ref)}</b> · ${esc(o.shop || '')}</span><b>${aed(o.total)}</b></div>
       <a class="btn small" target="_blank" href="https://wa.me/${esc((o.whatsapp || '').replace(/\D/g,''))}?text=${waText(o)}">Send order to the shop on WhatsApp · ابعتي الطلب للمتجر</a>
       <a class="btn small ghost" href="/market/order.html?ref=${encodeURIComponent(o.ref)}">Track · تابعي</a></div>`).join('')}
-    <p class="muted">Growth Vouchers: your codes appear on the order page once payment is confirmed. · أكواد القسائم بتظهر في صفحة الطلب بعد تأكيد الدفع.</p>
+    <p class="muted">Advance Purchase Vouchers: your codes appear on the order page once payment is confirmed. · أكواد القسائم بتظهر في صفحة الطلب بعد تأكيد الدفع.</p>
     <p class="muted" style="margin-top:8px">Pay cash on delivery. Keep your order number. · احتفظي برقم الطلب.</p>
     <p style="margin-top:14px"><a class="btn" href="/market/">Back to shop · رجوع للسوق</a></p>`;
 };

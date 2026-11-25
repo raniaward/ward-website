@@ -11,7 +11,7 @@
 <body>
 <main class="wrap" style="max-width:760px">
   <h1>My order <span class="ar">· طلبي</span></h1>
-  <p class="muted">Track your order, get your Growth Voucher codes and rate what you bought. · تابعي طلبك، خدي أكواد القسائم، وقيّمي مشترياتك.</p>
+  <p class="muted">Track your order, get your Advance Purchase Voucher codes and rate what you bought. · تابعي طلبك، خدي أكواد القسائم، وقيّمي مشترياتك.</p>
   <form class="card" id="lf" style="margin-top:14px">
     <div class="row"><div><label>Order number · رقم الطلب</label><input name="ref" required placeholder="W261125-XXXXX" style="text-transform:uppercase"></div>
     <div><label>Mobile used for the order · الموبايل</label><input name="phone" required placeholder="+971…"></div></div>
@@ -42,7 +42,7 @@ async function load() {
     <div class="split"><span>Delivery + fees</span><span>${aed(+O.delivery_fee + +O.handling_fee)}</span></div>
     <div class="split"><b>Total · الإجمالي</b><b class="price">${aed(O.total_paid)}</b></div>
     <p class="muted">Payment: ${esc(O.payment_method.toUpperCase())} · ${esc(O.payment_status)}</p></div>
-    ${(O.vouchers || []).length ? `<h2>Your Growth Vouchers · قسائم النمو</h2>${O.vouchers.map(v => `<div class="card">
+    ${(O.vouchers || []).length ? `<h2>Your Advance Purchase Vouchers · قسائم الشراء المسبق</h2>${O.vouchers.map(v => `<div class="card">
       ${v.code ? `<span class="code">${esc(v.code)}</span>` : '<span class="muted">Code appears once payment is confirmed · الكود بيظهر بعد تأكيد الدفع</span>'}
       <div class="split" style="margin-top:8px"><span>Products worth · منتجات بقيمة ${aed(v.value)} · Left · المتبقي ${aed(v.balance)}</span>${tag(v.status)}</div>
       <p class="muted">Spend at ${esc(O.shop.name)} only · <b>from ${fmtDate(v.redeem_from)}</b> until ${fmtDate(v.expires_at)} · تتصرف من ${fmtDate(v.redeem_from)}. Share the code as a gift — whoever has it can use it.</p></div>`).join('')}` : ''}
@@ -53,7 +53,7 @@ async function load() {
 }
 
 async function cancelV() {
-  if (!confirm('Cancel this Growth Voucher order? WARD will arrange your refund. · تلغي القسيمة؟ وَرد هترجعلك فلوسك.')) return;
+  if (!confirm('Cancel this Advance Purchase Voucher order? WARD will arrange your refund. · تلغي القسيمة؟ وَرد هترجعلك فلوسك.')) return;
   const { error } = await sb.rpc('cancel_voucher_order', { p_ref: REF, p_phone: PHONE });
   if (error) return toast(errMsg(error));
   try { fetch('https://api.web3forms.com/submit', { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
