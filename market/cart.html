@@ -29,7 +29,7 @@
         <label style="font-weight:normal"><input type="radio" name="pay" value="cod" checked style="width:auto;margin:0 6px"> Cash on delivery · الدفع عند الاستلام <span class="muted" id="codFee"></span></label>
         <label style="font-weight:normal;opacity:.55"><input type="radio" name="pay" value="card" disabled style="width:auto;margin:0 6px"> Card — coming soon · الدفع بالكارت قريباً</label>
       </div>
-      <label>Gift voucher code (optional) · كود قسيمة</label>
+      <label>Have a voucher code? (optional) · عندك كود قسيمة؟</label>
       <div style="display:flex;gap:8px;align-items:center"><input id="vcode" placeholder="WV-XXXXXXXX" style="max-width:220px;text-transform:uppercase">
       <button type="button" class="btn small ghost" onclick="applyVoucher()">Apply · تطبيق</button></div>
       <p class="muted" id="vmsg" style="margin:-6px 0 10px"></p>
@@ -57,7 +57,7 @@ async function init() {
   // gift vouchers offered by the shops in this cart ("support this shop")
   const sids = [...new Set(PRODS.map(p => p.seller_id))];
   if (sids.length) {
-    const { data: vs } = await sb.from('products').select('id,title,price,stock,images,kind,seller_id,sellers(shop_name)')
+    const { data: vs } = await sb.from('products').select('id,title,price,voucher_value,stock,images,kind,seller_id,sellers(shop_name)')
       .eq('kind', 'voucher').eq('status', 'active').in('seller_id', sids).order('price');
     (vs || []).forEach(v => { if (!PRODS.some(p => p.id === v.id)) PRODS.push(v); });
   }
@@ -73,9 +73,9 @@ function draw() {
   cart.forEach(i => { const p = PRODS.find(x => x.id === i.id); if (p) (shops[p.seller_id] = shops[p.seller_id] || { id: p.seller_id, name: p.sellers.shop_name, rows: [] }).rows.push({ p, qty: i.qty }); });
   const support = s => { const vs = PRODS.filter(p => p.kind === 'voucher' && p.seller_id === s.id);
     if (!vs.length) return '';
-    return `<div class="note" style="margin-top:12px">🌷 <b>Support ${esc(s.name)}</b> — add a gift voucher for someone you love, spent at this shop only.<br>
-      <span class="ar">ادعمي ${esc(s.name)} — ضيفي قسيمة هدية لحد بتحبيه، تتصرف في المتجر ده بس.</span>
-      <div style="margin-top:8px">${vs.map(v => `<button class="btn small" onclick="addV(${v.id})">+ ${aed(v.price)} voucher</button>`).join(' ')}</div></div>`; };
+    return `<div class="note" style="margin-top:12px">🌱 <b>Grow with ${esc(s.name)}</b> — a Growth Voucher gives this shop working capital now; you (or someone you gift it to) spend it here later.<br>
+      <span class="ar">انمي مع ${esc(s.name)} — قسيمة النمو بتدّي المتجر رأس مال دلوقتي، وتتصرف فيه بعدين.</span>
+      <div style="margin-top:8px">${vs.map(v => `<button class="btn small" onclick="addV(${v.id})">+ Pay ${aed(v.price)}${+v.voucher_value > +v.price ? ' → spend ' + aed(v.voucher_value) : ''}</button>`).join(' ')}</div></div>`; };
   $('#items').innerHTML = Object.values(shops).map(s => `<div class="card"><b>${esc(s.name)}</b>
     ${s.rows.map(r => `<div class="split" style="align-items:center;border-top:1px solid #eee;margin-top:8px;padding-top:8px">
       <span>${esc(r.p.title)}<br><span class="muted">${aed(r.p.price)}</span></span>
@@ -84,7 +84,7 @@ function draw() {
   $('#checkout').style.display = 'block';
   summary();
 }
-function addV(id) { Cart.add(id, 1); toast('Gift voucher added 🎁 · اتضافت القسيمة'); draw(); }
+function addV(id) { Cart.add(id, 1); toast('Growth Voucher added 🌱 · اتضافت قسيمة النمو'); draw(); }
 function setQty(id, q) {
   const p = PRODS.find(x => x.id === id); q = Math.min(parseInt(q) || 0, p ? (p.kind === 'voucher' ? 10 : p.stock) : 0);
   Cart.set(Cart.get().map(i => i.id === id ? { ...i, qty: q } : i).filter(i => i.qty > 0)); draw();
@@ -133,7 +133,7 @@ $('#cf').onsubmit = async e => {
     <p>Your order is placed. Each shop will contact you on WhatsApp to confirm delivery.</p>
     <p class="ar">طلبك وصل. كل متجر هيكلمك على واتساب لتأكيد التوصيل.</p>
     ${data.map(o => `<div class="split"><span>Order <b>${esc(o.ref)}</b> · <a href="/market/order.html?ref=${encodeURIComponent(o.ref)}">track · تابعي</a></span><b>${aed(o.total)}</b></div>`).join('')}
-    <p class="muted">Gift vouchers: your codes appear on the order page once payment is confirmed. · أكواد القسائم بتظهر في صفحة الطلب بعد تأكيد الدفع.</p>
+    <p class="muted">Growth Vouchers: your codes appear on the order page once payment is confirmed. · أكواد القسائم بتظهر في صفحة الطلب بعد تأكيد الدفع.</p>
     <p class="muted" style="margin-top:8px">Pay cash on delivery. Keep your order number. · احتفظي برقم الطلب.</p>
     <p style="margin-top:14px"><a class="btn" href="/market/">Back to shop · رجوع للسوق</a></p>`;
 };

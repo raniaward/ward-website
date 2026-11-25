@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>WARD Shop · سوق وَرد</title>
-<meta name="description" content="Shop products and gift vouchers from women-owned businesses across the UAE.">
+<meta name="description" content="Shop products and Growth Vouchers from women-owned businesses across the UAE.">
 <link rel="icon" href="/favicon.png"><link rel="stylesheet" href="market.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.min.js"></script>
 <script src="ward.js"></script>
@@ -12,7 +12,7 @@
 <main class="wrap">
   <div id="shopHead">
     <h1>WARD Shop <span class="ar">· سوق وَرد</span></h1>
-    <p class="muted">Products and gift vouchers from women-owned businesses in the UAE. <span class="ar">منتجات وقسائم هدايا من مشاريع نسائية في الإمارات.</span></p>
+    <p class="muted">Products and Growth Vouchers from women-owned businesses in the UAE. <span class="ar">منتجات وقسائم نمو من مشاريع نسائية في الإمارات.</span></p>
   </div>
   <input id="q" placeholder="Search · ابحثي عن منتج" style="max-width:420px;margin-top:14px">
   <div class="chips" id="chips"></div>
@@ -29,11 +29,11 @@ let ALL = [], CAT = '', PR = {}, SR = {}, SELLER = new URLSearchParams(location.
 async function init() {
   await loadRates();
   $('#chips').innerHTML = `<button class="chip on" data-c="">All · الكل</button>
-    <button class="chip" data-c="voucher">🎁 Gift vouchers · قسائم هدايا</button>` +
+    <button class="chip" data-c="voucher">🌱 Growth Vouchers · قسائم النمو</button>` +
     RATES.map(r => `<button class="chip" data-c="${r.key}">${esc(r.name_en)} · ${esc(r.name_ar)}</button>`).join('');
   $$('#chips .chip').forEach(b => b.onclick = () => { CAT = b.dataset.c; $$('#chips .chip').forEach(x => x.classList.toggle('on', x === b)); render(); });
 
-  let q = sb.from('products').select('id,title,description,price,category,stock,images,kind,seller_id,sellers!inner(shop_name,slug,emirate,status)')
+  let q = sb.from('products').select('id,title,description,price,voucher_value,category,stock,images,kind,seller_id,sellers!inner(shop_name,slug,emirate,status)')
     .eq('status', 'active').eq('sellers.status', 'approved').order('created_at', { ascending: false }).limit(300);
   if (SELLER) q = q.eq('sellers.slug', SELLER);
   const [{ data, error }, pr, sr] = await Promise.all([q, sb.from('product_ratings').select('*'), sb.from('seller_ratings').select('*')]);
@@ -55,7 +55,7 @@ async function shopHeader() {
     <div>${stars(r.avg_rating, r.review_count) || '<span class="muted">New shop · متجر جديد</span>'} · <span class="muted">${esc(s.emirate || '')}</span>
     ${s.instagram ? ` · <a href="https://instagram.com/${encodeURIComponent(s.instagram.replace('@',''))}" target="_blank">${esc(s.instagram)}</a>` : ''}</div></div></div>
     ${s.bio ? `<p style="margin:12px 0;white-space:pre-line">${esc(s.bio)}</p>` : ''}
-    ${ALL.some(x => x.kind === 'voucher') ? `<p><button class="btn" onclick="giftFrom('${s.id}')">🎁 Support this shop — buy a gift voucher · ادعمي المتجر بقسيمة</button></p>` : ''}
+    ${ALL.some(x => x.kind === 'voucher') ? `<p><button class="btn" onclick="giftFrom('${s.id}')">🌱 Grow with this shop — Growth Voucher · انمي مع المتجر — قسيمة نمو</button></p>` : ''}
     <p class="muted"><a href="/market/">← All shops · كل المتاجر</a></p>`;
   const { data: rv } = await sb.from('reviews').select('*').eq('seller_id', s.id).eq('status', 'published').order('created_at', { ascending: false }).limit(30);
   $('#shopReviews').innerHTML = `<h2>Reviews · التقييمات</h2><div class="card">${reviewList(rv)}</div>`;
@@ -74,7 +74,7 @@ function render() {
   }
   $('#grid').innerHTML = list.map(p => { const r = PR[p.id] || {}; return `<div class="prod" onclick="openPM(${p.id})">
     <div class="ph" style="background-image:url('${esc(imgUrl(p.images[0]))}')"></div>
-    <div class="in">${p.kind === 'voucher' ? '<span class="vbadge">🎁 Gift voucher</span>' : ''}<b>${esc(p.title)}</b>
+    <div class="in">${p.kind === 'voucher' ? '<span class="vbadge">🌱 Growth Voucher</span>' : ''}<b>${esc(p.title)}</b>
     <span class="muted">${esc(p.sellers.shop_name)}</span><br><span class="price">${aed(p.price)}</span>
     ${p.kind !== 'voucher' && p.stock < 1 ? ' <span class="tag cancelled">sold out</span>' : ''}
     <div>${stars(r.avg_rating, r.review_count)}</div></div></div>`; }).join('');
@@ -88,14 +88,15 @@ async function openPM(id) {
   $('#pmBody').innerHTML = `<div class="pd">
     <div><div class="main" id="mainImg" style="background-image:url('${esc(imgUrl(imgs[0]))}')"></div>
       <div class="thumbs">${imgs.map(i => `<div style="background-image:url('${esc(imgUrl(i))}')" onclick="$('#mainImg').style.backgroundImage='url(${esc(imgUrl(i))})'"></div>`).join('')}</div></div>
-    <div>${isV ? '<span class="vbadge">🎁 Gift voucher · قسيمة هدية</span>' : ''}
+    <div>${isV ? '<span class="vbadge">🌱 Growth Voucher · قسيمة نمو</span>' : ''}
       <h2 style="margin-top:4px">${esc(p.title)}</h2>
       <p><a href="?shop=${encodeURIComponent(p.sellers.slug)}">${esc(p.sellers.shop_name)}</a> · <span class="muted">${esc(p.sellers.emirate || '')}</span></p>
       <div>${stars(r.avg_rating, r.review_count)}</div>
       <p class="price" style="font-size:22px;margin:10px 0">${aed(p.price)}</p>
-      ${!isV && ALL.some(x => x.kind === 'voucher' && x.seller_id === p.seller_id) ? `<p><a href="#" onclick="giftFrom('${p.seller_id}');return false">🌷 Support this shop — gift a voucher · ادعمي المتجر بقسيمة هدية</a></p>` : ''}
-      ${isV ? `<div class="note">This voucher can be spent only at <b>${esc(p.sellers.shop_name)}</b> on WARD, within 12 months. You get the code once payment is confirmed.<br>
-        <span class="ar">القسيمة دي تتصرف في متجر ${esc(p.sellers.shop_name)} بس، خلال 12 شهر. الكود بيوصلك بعد تأكيد الدفع.</span></div>` : `<p class="muted">${esc(catName(p.category))}</p>`}
+      ${!isV && ALL.some(x => x.kind === 'voucher' && x.seller_id === p.seller_id) ? `<p><a href="#" onclick="giftFrom('${p.seller_id}');return false">🌱 Grow with this shop — Growth Voucher · انمي مع المتجر</a></p>` : ''}
+      ${isV ? `<div class="note">${+p.voucher_value > +p.price ? `<b>Pay ${aed(p.price)} now — spend ${aed(p.voucher_value)} at this shop.</b><br>` : ''}
+        A Growth Voucher gives <b>${esc(p.sellers.shop_name)}</b> working capital today; you spend it later at this shop only, within 12 months. Your code appears once payment is confirmed. It is a prepaid shop voucher, not an investment.<br>
+        <span class="ar">${+p.voucher_value > +p.price ? `ادفعي ${p.price} درهم دلوقتي — واصرفي ${p.voucher_value} درهم في المتجر. ` : ''}قسيمة النمو بتدّي المتجر رأس مال دلوقتي، وإنتي تصرفيها بعدين في نفس المتجر خلال 12 شهر.</span></div>` : `<p class="muted">${esc(catName(p.category))}</p>`}
       <p style="white-space:pre-line;margin:12px 0">${esc(p.description || '')}</p>
       ${avail ? `<label>Quantity · الكمية</label><input type="number" id="qty" min="1" max="${isV ? 10 : p.stock}" value="1" style="max-width:110px">
       <br><button class="btn" onclick="addCart(${p.id})">Add to cart · أضيفي للسلة</button>` : '<p><span class="tag cancelled">Sold out · نفدت الكمية</span></p>'}
