@@ -28,6 +28,7 @@ header{position:sticky;top:0;background:var(--cream);z-index:50;border-bottom:1p
 .logo img{height:52px;width:auto;display:block}
 nav a{color:var(--red);text-decoration:none;margin:0 6px;font-family:Arial,sans-serif;font-size:14.5px}
 .tools{display:flex;gap:8px;align-items:center}
+.menu-btn{display:none;background:#fff;border:2px solid var(--red);color:var(--red);border-radius:12px;font-size:20px;padding:3px 11px;cursor:pointer}
 .country{border:2px solid var(--red);color:var(--red);background:#fff;padding:7px 10px;border-radius:30px;font-size:14px;cursor:pointer;max-width:170px}
 .btn{background:var(--red);color:#fff;padding:13px 28px;border-radius:30px;text-decoration:none;font-family:Arial,sans-serif;border:none;cursor:pointer;font-size:16px;display:inline-block;margin:5px;font-weight:bold}
 .gold{background:var(--rose);color:#fff}
@@ -150,7 +151,7 @@ body.arabic .warda h2,body.arabic .sponsor h2{text-align:start}
  h2{font-size:27px}
  .how,.warda,.sponsor{grid-template-columns:1fr}.how img{min-height:200px;height:220px}.warda{padding:28px 20px}.warda img{max-width:160px}.caps{grid-template-columns:1fr}
  .sponsor{padding:34px 22px}
- .founder{flex-direction:column;text-align:center}nav{display:none}
+ .founder{flex-direction:column;text-align:center}nav{display:none}header.open nav{display:flex;flex-direction:column;position:absolute;top:100%;left:0;right:0;background:var(--cream);padding:10px 20px 18px;border-bottom:1px solid #d9dfc8;box-shadow:0 10px 24px rgba(0,0,0,.08)}header.open nav a{padding:10px 4px;font-size:16px;border-bottom:1px solid #ece9dc}.menu-btn{display:inline-block}.country{max-width:110px}
  .logo img{height:42px}.country{max-width:118px;font-size:13px}.lang{padding:6px 12px}
  .wa{bottom:96px;left:14px;width:52px;height:52px}
 }
@@ -189,6 +190,7 @@ function loadTranslate(b){b.style.display='none';var s=document.createElement('s
 <a href="/market/seller.html#signup" style="background:var(--red);color:#fff;border-radius:20px;padding:5px 13px"><span class="en">Sign up</span><span class="ar">حساب جديد</span></a>
 </nav>
 <div class="tools">
+<button class="menu-btn" aria-label="Menu" onclick="document.querySelector('header').classList.toggle('open')">☰</button>
 <select class="country notranslate" onchange="pickCountry(this)" aria-label="Country / الدولة">
 <option value="AE" selected>🇦🇪 UAE · الإمارات</option>
 <option value="SA">🇸🇦 Saudi Arabia · السعودية (soon)</option>
@@ -634,10 +636,12 @@ function loadTranslate(b){b.style.display='none';var s=document.createElement('s
 
 <a class="wa" href="https://wa.me/971527043491?text=%D9%85%D8%B1%D8%AD%D8%A8%D8%A7%D9%8B%D8%8C%20%D8%A3%D8%A8%D8%BA%D9%89%20%D8%A3%D8%B9%D8%B1%D9%81%20%D8%A3%D9%83%D8%AB%D8%B1%20%D8%B9%D9%86%20%D9%88%D8%B1%D8%AF" target="_blank" rel="noopener" aria-label="WhatsApp"><svg><use href="#s-wa"/></svg></a>
 
-<elevenlabs-convai agent-id="agent_2001m840h2f0f1h8bjwt7n7b8ezr" avatar-image-url="https://wardworld.org/warda.svg" action-text="تحتاجين مساعدة؟ كلّمي وردة 🌷" start-call-text="كلّمي وردة" end-call-text="إنهاء" listening-text="وردة تسمعك..." speaking-text="وردة تتكلم"></elevenlabs-convai>
+<script>if(innerWidth<700)document.write('<style>elevenlabs-convai{zoom:.8}</style>')</script>
+<elevenlabs-convai variant="compact" agent-id="agent_2001m840h2f0f1h8bjwt7n7b8ezr" avatar-image-url="https://wardworld.org/warda.svg" action-text="تحتاجين مساعدة؟ كلّمي وردة 🌷" start-call-text="كلّمي وردة" end-call-text="إنهاء" listening-text="وردة تسمعك..." speaking-text="وردة تتكلم"></elevenlabs-convai>
 <script src="https://unpkg.com/@elevenlabs/convai-widget-embed" async type="text/javascript"></script>
 <script>
 document.querySelectorAll('form input[placeholder],form textarea[placeholder]').forEach(function(f,i){if(f.type==='hidden')return;var id='f'+i;f.id=id;var l=document.createElement('label');l.htmlFor=id;l.textContent=f.placeholder.replace(/ \/ .*/,'')+(f.required?' *':'');var a=document.createElement('span');a.className='ar';a.textContent=' · '+(f.placeholder.split(' / ')[1]||'');l.appendChild(a);f.parentNode.insertBefore(l,f);});
 </script>
+<script>document.querySelectorAll("nav a").forEach(a=>a.addEventListener("click",()=>document.querySelector("header").classList.remove("open")));</script>
 </body>
 </html>
