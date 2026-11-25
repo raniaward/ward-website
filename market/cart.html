@@ -73,9 +73,9 @@ function draw() {
   cart.forEach(i => { const p = PRODS.find(x => x.id === i.id); if (p) (shops[p.seller_id] = shops[p.seller_id] || { id: p.seller_id, name: p.sellers.shop_name, rows: [] }).rows.push({ p, qty: i.qty }); });
   const support = s => { const vs = PRODS.filter(p => p.kind === 'voucher' && p.seller_id === s.id);
     if (!vs.length) return '';
-    return `<div class="note" style="margin-top:12px">🌱 <b>Grow with ${esc(s.name)}</b> — a Growth Voucher gives this shop working capital now; you (or someone you gift it to) spend it here later.<br>
-      <span class="ar">انمي مع ${esc(s.name)} — قسيمة النمو بتدّي المتجر رأس مال دلوقتي، وتتصرف فيه بعدين.</span>
-      <div style="margin-top:8px">${vs.map(v => `<button class="btn small" onclick="addV(${v.id})">+ Pay ${aed(v.price)}${+v.voucher_value > +v.price ? ' → spend ' + aed(v.voucher_value) : ''}</button>`).join(' ')}</div></div>`; };
+    return `<div class="note" style="margin-top:12px">🌱 <b>Grow with ${esc(s.name)}</b> — pay now and give this shop working capital today; after one year, spend more value here (or gift it).<br>
+      <span class="ar">انمي مع ${esc(s.name)} — ادفعي دلوقتي والمتجر ياخد رأس مال النهارده، وبعد سنة اصرفي قيمة أكبر هنا.</span>
+      <div style="margin-top:8px">${vs.map(v => `<button class="btn small" onclick="addV(${v.id})">+ Pay ${aed(v.price)}${+v.voucher_value > +v.price ? ' → spend ' + aed(v.voucher_value) + ' after 1 year' : ''}</button>`).join(' ')}</div></div>`; };
   $('#items').innerHTML = Object.values(shops).map(s => `<div class="card"><b>${esc(s.name)}</b>
     ${s.rows.map(r => `<div class="split" style="align-items:center;border-top:1px solid #eee;margin-top:8px;padding-top:8px">
       <span>${esc(r.p.title)}<br><span class="muted">${aed(r.p.price)}</span></span>
@@ -96,6 +96,8 @@ async function applyVoucher() {
   const { data } = await sb.rpc('check_voucher', { p_code: c });
   if (!data || data.status !== 'active' || data.balance <= 0 || data.expires_at < new Date().toISOString().slice(0,10)) {
     $('#vmsg').textContent = 'This code is not valid or already used. · الكود غير صالح.'; return summary(); }
+  if (data.redeem_from > new Date().toISOString().slice(0,10)) {
+    $('#vmsg').textContent = `This Growth Voucher can be used from ${fmtDate(data.redeem_from)}. · القسيمة تتصرف من ${fmtDate(data.redeem_from)}.`; return summary(); }
   if (!PRODS.some(p => p.seller_id === data.seller_id && Cart.get().some(i => i.id === p.id))) {
     $('#vmsg').textContent = `This voucher is for ${data.shop} only — add items from that shop. · القسيمة دي لمتجر ${data.shop} بس.`; return summary(); }
   VOUCHER = data; $('#vmsg').textContent = `✓ ${data.shop} voucher — balance ${aed(data.balance)}`; summary();

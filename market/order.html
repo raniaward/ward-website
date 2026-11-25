@@ -45,7 +45,7 @@ async function load() {
     ${(O.vouchers || []).length ? `<h2>Your Growth Vouchers · قسائم النمو</h2>${O.vouchers.map(v => `<div class="card">
       ${v.code ? `<span class="code">${esc(v.code)}</span>` : '<span class="muted">Code appears once payment is confirmed · الكود بيظهر بعد تأكيد الدفع</span>'}
       <div class="split" style="margin-top:8px"><span>Value · القيمة ${aed(v.value)} · Balance · الرصيد ${aed(v.balance)}</span>${tag(v.status)}</div>
-      <p class="muted">Spend at ${esc(O.shop.name)} only · valid until ${fmtDate(v.expires_at)}. Share the code as a gift — whoever has it can use it.</p></div>`).join('')}` : ''}
+      <p class="muted">Spend at ${esc(O.shop.name)} only · <b>from ${fmtDate(v.redeem_from)}</b> until ${fmtDate(v.expires_at)} · تتصرف من ${fmtDate(v.redeem_from)}. Share the code as a gift — whoever has it can use it.</p></div>`).join('')}` : ''}
     ${O.status === 'delivered' ? `<h2>Rate your items · قيّمي مشترياتك</h2>${(O.items || []).filter(i => i.kind !== 'voucher' && i.product_id).map(rateCard).join('')}` :
       `<p class="note">You can rate your items once the order is delivered. · تقدري تقيّمي بعد الاستلام.</p>`}`;
 }
