@@ -22,7 +22,7 @@
         <div><label>Email (optional) · الإيميل</label><input name="email" type="email" maxlength="120"></div>
         <div><label>Emirate · الإمارة</label><select name="emirate" required>${''}</select></div>
       </div>
-      <label>Delivery address · عنوان التوصيل</label><textarea name="address" rows="2" required maxlength="300"></textarea>
+      <div id="addrBox"><label>Delivery address · عنوان التوصيل</label><textarea name="address" rows="2" required maxlength="300"></textarea></div>
       <label>Notes for the seller (optional) · ملاحظات</label><textarea name="notes" rows="2" maxlength="300"></textarea>
       <label>Payment · الدفع</label>
       <div style="margin:6px 0 12px;line-height:2">
@@ -73,9 +73,9 @@ function draw() {
   cart.forEach(i => { const p = PRODS.find(x => x.id === i.id); if (p) (shops[p.seller_id] = shops[p.seller_id] || { id: p.seller_id, name: p.sellers.shop_name, rows: [] }).rows.push({ p, qty: i.qty }); });
   const support = s => { const vs = PRODS.filter(p => p.kind === 'voucher' && p.seller_id === s.id);
     if (!vs.length) return '';
-    return `<div class="note" style="margin-top:12px">🌱 <b>Grow with ${esc(s.name)}</b> — pay now and give this shop working capital today; after one year, spend more value here (or gift it).<br>
-      <span class="ar">انمي مع ${esc(s.name)} — ادفعي دلوقتي والمتجر ياخد رأس مال النهارده، وبعد سنة اصرفي قيمة أكبر هنا.</span>
-      <div style="margin-top:8px">${vs.map(v => `<button class="btn small" onclick="addV(${v.id})">+ Pay ${aed(v.price)}${+v.voucher_value > +v.price ? ' → spend ' + aed(v.voucher_value) + ' after 1 year' : ''}</button>`).join(' ')}</div></div>`; };
+    return `<div class="note" style="margin-top:12px">🌱 <b>Grow with ${esc(s.name)}</b> — pay now and give this shop working capital today; after one year, get more in products from this shop (or gift it).<br>
+      <span class="ar">انمي مع ${esc(s.name)} — ادفعي دلوقتي والمتجر ياخد رأس مال النهارده، وبعد سنة خدي منتجات بقيمة أكبر من هنا.</span>
+      <div style="margin-top:8px">${vs.map(v => `<button class="btn small" onclick="addV(${v.id})">+ Pay ${aed(v.price)}${+v.voucher_value > +v.price ? ' → ' + aed(v.voucher_value) + ' in products after 1 year' : ''}</button>`).join(' ')}</div></div>`; };
   $('#items').innerHTML = Object.values(shops).map(s => `<div class="card"><b>${esc(s.name)}</b>
     ${s.rows.map(r => `<div class="split" style="align-items:center;border-top:1px solid #eee;margin-top:8px;padding-top:8px">
       <span>${esc(r.p.title)}<br><span class="muted">${aed(r.p.price)}</span></span>
@@ -109,12 +109,15 @@ function summary() {
   if (VOUCHER) vdisc = Math.min(VOUCHER.balance, phys[VOUCHER.seller_id] || 0);
   const n = sellers.size, del = S.delivery_fee * Object.keys(phys).length, cod = S.cod_fee * n;
   items -= vdisc;
+  const needAddr = Object.keys(phys).length > 0;
+  $('#addrBox').style.display = needAddr ? '' : 'none';
+  $('textarea[name=address]').required = needAddr;
   $('#sum').innerHTML = `<div class="split"><span>Items · المنتجات</span><b>${aed(items)}</b></div>
     ${vdisc ? `<div class="split"><span>Voucher · القسيمة</span><b>− ${aed(vdisc)}</b></div>` : ''}
     <div class="split"><span>Delivery · التوصيل</span><b>${aed(del)}</b></div>
     <div class="split"><span>Cash-on-delivery fee · رسوم الدفع عند الاستلام</span><b>${aed(cod)}</b></div>
     <div class="split" style="border-top:1px solid var(--line);margin-top:6px;padding-top:8px;font-size:17px"><span>Total · الإجمالي</span><b class="price">${aed(items + del + cod)}</b></div>
-    <p class="muted" style="margin-top:6px">Each shop sends its own delivery. Final total is confirmed on your order. · كل متجر بيوصّل طلبه.</p>`;
+    <p class="muted" style="margin-top:6px">${needAddr ? 'Each shop sends its own delivery. · كل متجر بيوصّل طلبه.' : 'Growth Vouchers only — no delivery needed. · قسائم بس، مفيش توصيل.'}</p>`;
 }
 
 $('#cf').onsubmit = async e => {
@@ -128,13 +131,21 @@ $('#cf').onsubmit = async e => {
   });
   if (error) { toast(errMsg(error)); b.disabled = false; b.textContent = 'Place order · أكّدي الطلب'; return; }
   try { localStorage.setItem('ward_phone', f.get('phone')); } catch {}
+  // notify WARD by email (free Web3Forms); never blocks the buyer
+  try { fetch('https://api.web3forms.com/submit', { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ access_key: 'f21e0196-4584-4e59-af8e-26524f373dee', subject: 'WARD new order: ' + data.map(o => o.ref).join(', '), from_name: 'WARD marketplace',
+      orders: data.map(o => `${o.ref} · ${o.shop} · AED ${o.total}`).join('\n'), buyer: f.get('name'), phone: f.get('phone'), payment: f.get('pay'),
+      admin: 'https://wardworld.org/market/admin.html' }) }).catch(() => {}); } catch {}
+  const waText = o => encodeURIComponent(`Hello ${o.shop} 🌷 I just placed order ${o.ref} on WARD (AED ${o.total}). Name: ${f.get('name')}. مرحبا، عملت طلب ${o.ref} على ورد.`);
   Cart.set([]);
   $('#items').style.display = 'none'; $('#checkout').style.display = 'none';
   $('#done').style.display = 'block';
   $('#done').innerHTML = `<h2 style="margin-top:0">Thank you! · شكراً ليكي 🌷</h2>
     <p>Your order is placed. Each shop will contact you on WhatsApp to confirm delivery.</p>
     <p class="ar">طلبك وصل. كل متجر هيكلمك على واتساب لتأكيد التوصيل.</p>
-    ${data.map(o => `<div class="split"><span>Order <b>${esc(o.ref)}</b> · <a href="/market/order.html?ref=${encodeURIComponent(o.ref)}">track · تابعي</a></span><b>${aed(o.total)}</b></div>`).join('')}
+    ${data.map(o => `<div class="card" style="background:var(--cream)"><div class="split"><span>Order <b>${esc(o.ref)}</b> · ${esc(o.shop || '')}</span><b>${aed(o.total)}</b></div>
+      <a class="btn small" target="_blank" href="https://wa.me/${esc((o.whatsapp || '').replace(/\D/g,''))}?text=${waText(o)}">Send order to the shop on WhatsApp · ابعتي الطلب للمتجر</a>
+      <a class="btn small ghost" href="/market/order.html?ref=${encodeURIComponent(o.ref)}">Track · تابعي</a></div>`).join('')}
     <p class="muted">Growth Vouchers: your codes appear on the order page once payment is confirmed. · أكواد القسائم بتظهر في صفحة الطلب بعد تأكيد الدفع.</p>
     <p class="muted" style="margin-top:8px">Pay cash on delivery. Keep your order number. · احتفظي برقم الطلب.</p>
     <p style="margin-top:14px"><a class="btn" href="/market/">Back to shop · رجوع للسوق</a></p>`;

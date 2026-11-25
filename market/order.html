@@ -44,12 +44,22 @@ async function load() {
     <p class="muted">Payment: ${esc(O.payment_method.toUpperCase())} · ${esc(O.payment_status)}</p></div>
     ${(O.vouchers || []).length ? `<h2>Your Growth Vouchers · قسائم النمو</h2>${O.vouchers.map(v => `<div class="card">
       ${v.code ? `<span class="code">${esc(v.code)}</span>` : '<span class="muted">Code appears once payment is confirmed · الكود بيظهر بعد تأكيد الدفع</span>'}
-      <div class="split" style="margin-top:8px"><span>Value · القيمة ${aed(v.value)} · Balance · الرصيد ${aed(v.balance)}</span>${tag(v.status)}</div>
+      <div class="split" style="margin-top:8px"><span>Products worth · منتجات بقيمة ${aed(v.value)} · Left · المتبقي ${aed(v.balance)}</span>${tag(v.status)}</div>
       <p class="muted">Spend at ${esc(O.shop.name)} only · <b>from ${fmtDate(v.redeem_from)}</b> until ${fmtDate(v.expires_at)} · تتصرف من ${fmtDate(v.redeem_from)}. Share the code as a gift — whoever has it can use it.</p></div>`).join('')}` : ''}
+    ${(O.items || []).length && O.items.every(i => i.kind === 'voucher') && !['cancelled','refunded'].includes(O.status) && (Date.now() - new Date(O.created_at)) < 14 * 864e5 && (O.vouchers || []).every(v => +v.balance === +v.value) ?
+      `<p><button class="btn small ghost" onclick="cancelV()">Cancel this voucher order (within 14 days) · إلغاء القسيمة خلال 14 يوم</button></p>` : ''}
     ${O.status === 'delivered' ? `<h2>Rate your items · قيّمي مشترياتك</h2>${(O.items || []).filter(i => i.kind !== 'voucher' && i.product_id).map(rateCard).join('')}` :
       `<p class="note">You can rate your items once the order is delivered. · تقدري تقيّمي بعد الاستلام.</p>`}`;
 }
 
+async function cancelV() {
+  if (!confirm('Cancel this Growth Voucher order? WARD will arrange your refund. · تلغي القسيمة؟ وَرد هترجعلك فلوسك.')) return;
+  const { error } = await sb.rpc('cancel_voucher_order', { p_ref: REF, p_phone: PHONE });
+  if (error) return toast(errMsg(error));
+  try { fetch('https://api.web3forms.com/submit', { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ access_key: 'f21e0196-4584-4e59-af8e-26524f373dee', subject: 'WARD voucher cancelled — refund needed: ' + REF, from_name: 'WARD marketplace', order: REF, phone: PHONE }) }).catch(() => {}); } catch {}
+  toast('Cancelled. WARD will contact you about your refund. · اتلغت، وَرد هتكلمك بخصوص الفلوس.'); load();
+}
 const PICK = {}, PHOTOS = {};
 function rateCard(i) {
   PICK[i.product_id] = i.review ? i.review.rating : 0; PHOTOS[i.product_id] = [];

@@ -109,9 +109,9 @@ async function openPM(id) {
       <div>${stars(r.avg_rating, r.review_count)}</div>
       <p class="price" style="font-size:22px;margin:10px 0">${aed(p.price)}</p>
       ${!isV && ALL.some(x => x.kind === 'voucher' && x.seller_id === p.seller_id) ? `<p><a href="#" onclick="giftFrom('${p.seller_id}');return false">🌱 Grow with this shop — Growth Voucher · انمي مع المتجر</a></p>` : ''}
-      ${isV ? `<div class="note">${+p.voucher_value > +p.price ? `<b>Pay ${aed(p.price)} now — after one year, spend ${aed(p.voucher_value)} at this shop.</b><br>` : ''}
-        A Growth Voucher gives <b>${esc(p.sellers.shop_name)}</b> working capital today. You can spend it at this shop only, starting <b>one year after purchase</b> and for the 12 months after that. Your code appears once payment is confirmed. It is a prepaid shop voucher, not an investment.<br>
-        <span class="ar">${+p.voucher_value > +p.price ? `ادفعي ${p.price} درهم دلوقتي — وبعد سنة اصرفي ${p.voucher_value} درهم في المتجر. ` : ''}قسيمة النمو بتدّي المتجر رأس مال دلوقتي، وتقدري تصرفيها في نفس المتجر بعد سنة من الشراء، وخلال الـ12 شهر اللي بعدها.</span></div>` : `<p class="muted">${esc(catName(p.category))}</p>`}
+      ${isV ? `<div class="note">${+p.voucher_value > +p.price ? `<b>Pay ${aed(p.price)} now — after one year, get products worth ${aed(p.voucher_value)} from this shop.</b><br>` : ''}
+        A Growth Voucher gives <b>${esc(p.sellers.shop_name)}</b> working capital today. It is redeemed for <b>products from this shop only</b> (never cash), starting <b>one year after purchase</b> and for the 12 months after that. Your code appears once payment is confirmed. It is a prepaid shop voucher, not an investment.<br>
+        <span class="ar">${+p.voucher_value > +p.price ? `ادفعي ${p.price} درهم دلوقتي — وبعد سنة خدي منتجات بقيمة ${p.voucher_value} درهم من المتجر. ` : ''}قسيمة النمو بتدّي المتجر رأس مال دلوقتي، وبتتصرف منتجات بس من نفس المتجر (مش فلوس)، بعد سنة من الشراء وخلال الـ12 شهر اللي بعدها.</span></div>` : `<p class="muted">${esc(catName(p.category))}</p>`}
       <p style="white-space:pre-line;margin:12px 0">${esc(p.description || '')}</p>
       ${avail ? `<label>Quantity · الكمية</label><input type="number" id="qty" min="1" max="${isV ? 10 : p.stock}" value="1" style="max-width:110px">
       <br><button class="btn" onclick="addCart(${p.id})">Add to cart · أضيفي للسلة</button>` : '<p><span class="tag cancelled">Sold out · نفدت الكمية</span></p>'}
