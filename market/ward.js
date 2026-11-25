@@ -67,7 +67,14 @@ function header(active) {
   const bar = document.createElement('div'); bar.className = 'acct'; bar.id = 'acct';
   h.after(bar);
   sb.auth.getSession().then(({ data: { session } }) => {
-    if (!session) { bar.style.display = 'none'; return; }
+    if (!session) {
+      bar.innerHTML = `<span>New here? · جديدة هنا؟</span>
+        <a class="btn small" href="/market/seller.html#signup" onclick="if(location.pathname.endsWith('seller.html'))setTimeout(()=>location.reload(),50)">Sign up · حساب جديد</a>
+        <a class="btn small ghost" href="/market/seller.html#login" onclick="if(location.pathname.endsWith('seller.html'))setTimeout(()=>location.reload(),50)">Log in · دخول</a>`;
+      return;
+    }
+    const nav = h.querySelector('nav'); const al = document.createElement('a');
+    al.href = '/market/seller.html'; al.textContent = 'My account · حسابي'; nav.insertBefore(al, nav.lastElementChild);
     bar.innerHTML = `Logged in as <b>${esc(session.user.email)}</b> · مسجّلة دخول
       <button class="btn small ghost" onclick="logout()">Log out · خروج</button>`;
   });

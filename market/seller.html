@@ -19,7 +19,7 @@ async function boot() {
   await loadRates();
   const { data: { session } } = await sb.auth.getSession();
   USER = session && session.user;
-  if (!USER) return authView();
+  if (!USER) return authView(location.hash === '#signup' ? 'signup' : 'login');
   const { data } = await sb.from('sellers').select('*').eq('id', USER.id).maybeSingle();
   SELLER = data;
   if (!SELLER) {
