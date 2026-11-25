@@ -4,9 +4,9 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>WARD Admin</title>
 <meta name="robots" content="noindex,nofollow">
-<link rel="icon" href="/favicon.png"><link rel="stylesheet" href="market.css?v=13">
+<link rel="icon" href="/favicon.png"><link rel="stylesheet" href="market.css?v=14">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.min.js"></script>
-<script src="ward.js?v=13"></script>
+<script src="ward.js?v=14"></script>
 </head>
 <body>
 <main class="wrap" id="app"><p class="muted">Loading…</p></main>
@@ -58,7 +58,7 @@ async function upd(id, row) { const { error } = await sb.from('sellers').update(
 
 async function orders() {
   const { data } = await sb.from('orders').select('*,order_items(*),sellers(shop_name)').order('created_at', { ascending: false }).limit(300);
-  $('#pane').innerHTML = `<div style="overflow-x:auto"><table><tr><th>Order</th><th>Shop</th><th>Buyer</th><th>Items</th><th>Paid by buyer</th><th>Commission</th><th>Seller gets</th><th>Status</th><th>Payment</th></tr>
+  $('#pane').innerHTML = `<p><button class="btn small ghost" onclick="csvOrders()">⬇ Download Excel (CSV)</button></p><div style="overflow-x:auto"><table><tr><th>Order</th><th>Shop</th><th>Buyer</th><th>Items</th><th>Paid by buyer</th><th>Commission</th><th>Seller gets</th><th>Status</th><th>Payment</th></tr>
   ${(data || []).map(o => `<tr><td><b>${esc(o.ref)}</b><br><span class="muted">${fmtDate(o.created_at)}</span></td><td>${esc(o.sellers?.shop_name)}</td>
     <td>${esc(o.buyer_name)}<br><a href="https://wa.me/${esc(o.buyer_phone.replace(/\D/g,''))}" target="_blank">${esc(o.buyer_phone)}</a><br><span class="muted">${esc(o.emirate || '')}</span></td>
     <td>${o.order_items.map(i => `${i.qty}× ${esc(i.title)} (${i.rate}%)`).join('<br>')}</td>
@@ -139,7 +139,7 @@ async function founding() {
   const { data, error } = await sb.from('founding_applications').select('*').order('created_at', { ascending: false });
   if (error) return $('#pane').innerHTML = esc(error.message);
   const a = data || [], taken = a.filter(x => ['selected','verified','agreement_sent','activated'].includes(x.status)).length;
-  $('#pane').innerHTML = `<div class="kpis"><div class="kpi">Applications · الطلبات<b>${a.length}</b></div>
+  $('#pane').innerHTML = `<p><button class="btn small ghost" onclick="csvFounding()">⬇ Download Excel (CSV)</button></p><div class="kpis"><div class="kpi">Applications · الطلبات<b>${a.length}</b></div>
     <div class="kpi">New · جديدة<b>${a.filter(x => x.status === 'new').length}</b></div>
     <div class="kpi">Places taken · الأماكن<b>${taken} / 100</b></div>
     <div class="kpi">Activated · مفعّلة<b>${a.filter(x => x.status === 'activated').length}</b></div></div>
@@ -162,13 +162,40 @@ async function cases() {
   const c = data || [];
   $('#pane').innerHTML = `<div class="kpis"><div class="kpi">Open · مفتوحة<b>${c.filter(x => x.status === 'open').length}</b></div>
     <div class="kpi">In progress · جاري<b>${c.filter(x => x.status === 'in_progress').length}</b></div><div class="kpi">Resolved · اتحلّت<b>${c.filter(x => ['resolved','closed'].includes(x.status)).length}</b></div></div>
-  <div style="overflow-x:auto"><table><tr><th>Case</th><th>Buyer</th><th>Problem</th><th>Status</th><th>Resolution (buyer sees this)</th></tr>
+  <div style="overflow-x:auto"><table><tr><th>Case</th><th>Buyer</th><th>Problem</th><th>Status</th><th>Resolution (buyer sees this)</th><th>Refund · استرجاع</th></tr>
   ${c.map(x => `<tr><td><b>${esc(x.ref)}</b><br><span class="muted">${fmtDate(x.created_at)}</span><br>Order ${esc(x.orders?.ref || '')}<br>${esc(x.sellers?.shop_name || '')}</td>
     <td>${esc(x.name || '')}<br><a href="https://wa.me/${esc((x.phone || '').replace(/\D/g,''))}" target="_blank">${esc(x.phone)}</a></td>
     <td><b>${esc(CTYPES[x.type] || x.type)}</b><br>${esc(x.message)}</td>
     <td><select style="margin:0" onchange="cUpd(${x.id},{status:this.value})">${['open','in_progress','resolved','closed'].map(k => `<option ${k === x.status ? 'selected' : ''}>${k}</option>`).join('')}</select></td>
-    <td><textarea style="margin:0;min-width:180px" rows="2" onchange="cUpd(${x.id},{resolution:this.value})">${esc(x.resolution || '')}</textarea></td></tr>`).join('')}
+    <td><textarea style="margin:0;min-width:180px" rows="2" onchange="cUpd(${x.id},{resolution:this.value})">${esc(x.resolution || '')}</textarea></td>
+    <td>${x.refunded_at ? `<b>${aed(x.refund_amount)}</b><br><span class="muted">${esc(x.refund_method || '')} ${esc(x.refund_reference || '')}<br>paid by ${esc(x.refund_borne_by)} · ${fmtDate(x.refunded_at)}</span>` : x.order_id ?
+      `<form onsubmit="refund(event,${x.id})" style="min-width:170px"><input name="amount" type="number" min="0.01" step="0.01" placeholder="AED" required style="margin:0 0 4px">
+       <select name="method" style="margin:0 0 4px"><option value="cash">Cash</option><option value="bank transfer">Bank transfer</option><option value="card">Card</option></select>
+       <select name="borne" style="margin:0 0 4px"><option value="seller">Seller's mistake (from her payout)</option><option value="ward">WARD goodwill (WARD pays)</option></select>
+       <input name="ref" placeholder="Reference" style="margin:0 0 4px"><button class="btn small">Record refund</button></form>` : '—'}</td></tr>`).join('')}
   </table></div>${c.length ? '' : '<p class="muted">No cases.</p>'}`;
+}
+async function refund(e, id) {
+  e.preventDefault(); const f = new FormData(e.target);
+  if (!confirm(`Record a refund of AED ${f.get('amount')}? Make sure the money was actually returned to the buyer.`)) return;
+  const { data, error } = await sb.rpc('admin_record_refund', { p_case: id, p_amount: +f.get('amount'), p_method: f.get('method'), p_reference: f.get('ref') || null, p_borne_by: f.get('borne') });
+  if (error) return toast(errMsg(error));
+  toast(data.full_refund ? 'Full refund recorded, order marked refunded' : 'Partial refund recorded' + (+data.commission_returned ? ` · AED ${data.commission_returned} commission returned to seller` : ''));
+  cases();
+}
+function downloadCSV(name, head, rows) {
+  const csv = '\ufeff' + [head, ...rows].map(r => r.map(v => '"' + String(v ?? '').replace(/"/g, '""') + '"').join(',')).join('\n');
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' })); a.download = name; a.click();
+}
+async function csvFounding() {
+  const { data } = await sb.from('founding_applications').select('*').order('created_at');
+  downloadCSV('WARD-founding-100.csv', ['ref','date','name','business','whatsapp','email','social','entity','licence','category','emirate','marketing_ok','step','notes'],
+    (data || []).map(x => [x.ref, x.created_at, x.name, x.business, x.whatsapp, x.email, x.social, x.entity, x.licence, x.category, x.emirate, x.marketing ? 'yes' : 'no', x.status, x.admin_notes]));
+}
+async function csvOrders() {
+  const { data } = await sb.from('orders').select('*,sellers(shop_name),order_items(title,qty,price)').order('created_at');
+  downloadCSV('WARD-orders.csv', ['ref','date','shop','buyer','phone','emirate','items','items_total','voucher_used','delivery','handling','paid_by_buyer','commission','vat','card_fee','seller_net','ward_net','refunded','payment','payment_status','status','delivered','payout_date','payout_status','payout_ref'],
+    (data || []).map(o => [o.ref, o.created_at, o.sellers?.shop_name, o.buyer_name, o.buyer_phone, o.emirate, (o.order_items || []).map(i => i.qty + 'x ' + i.title).join('; '), o.items_total, o.voucher_applied, o.delivery_fee, o.handling_fee, o.total_paid, o.commission, o.vat, (+o.gateway_items + +o.gateway_delivery).toFixed(2), o.seller_net, o.ward_net, o.refunded_amount, o.payment_method, o.payment_status, o.status, o.delivered_at, o.payout_date, o.payout_status, o.payout_reference]));
 }
 async function cUpd(id, row) { const { error } = await sb.from('cases').update(row).eq('id', id); toast(error ? errMsg(error) : 'Saved'); cases(); }
 

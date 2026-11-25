@@ -4,9 +4,9 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>My order · طلبي — WARD</title>
 <meta name="robots" content="noindex">
-<link rel="icon" href="/favicon.png"><link rel="stylesheet" href="market.css?v=13">
+<link rel="icon" href="/favicon.png"><link rel="stylesheet" href="market.css?v=14">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.min.js"></script>
-<script src="ward.js?v=13"></script>
+<script src="ward.js?v=14"></script>
 </head>
 <body>
 <main class="wrap" style="max-width:760px">
@@ -64,7 +64,7 @@ async function cancelV() {
 function casesBlock() {
   const cs = O.cases || [];
   return `<h2>Need help with this order? · محتاجة مساعدة؟</h2>
-    ${cs.map(c => `<div class="card"><div class="split"><b>Case ${esc(c.ref)}</b>${tag(c.status)}</div><p class="muted">${esc(c.type)} · ${fmtDate(c.created_at)}</p>${c.resolution ? `<p><b>WARD:</b> ${esc(c.resolution)}</p>` : '<p class="muted">We are looking into it. · بنتابعها.</p>'}</div>`).join('')}
+    ${cs.map(c => `<div class="card"><div class="split"><b>Case ${esc(c.ref)}</b>${tag(c.status)}</div><p class="muted">${esc(c.type)} · ${fmtDate(c.created_at)}</p>${c.refund_amount ? `<p>💸 <b>Refund: ${aed(c.refund_amount)}</b> · ${fmtDate(c.refunded_at)} · استرجاع</p>` : ''}${c.resolution ? `<p><b>WARD:</b> ${esc(c.resolution)}</p>` : '<p class="muted">We are looking into it. · بنتابعها.</p>'}</div>`).join('')}
     <details class="card"><summary style="cursor:pointer"><b>Report a problem · بلّغي عن مشكلة</b></summary>
       <form id="caseF" style="margin-top:10px"><label>What happened? · إيه المشكلة؟</label>
       <select name="type"><option value="not_received">Not received · الطلب ما وصلش</option><option value="late">Late · متأخر</option><option value="damaged">Damaged · وصل تالف</option><option value="wrong_item">Wrong item · منتج غلط</option><option value="refund">Refund request · استرجاع فلوس</option><option value="voucher">Voucher problem · مشكلة في القسيمة</option><option value="seller_conduct">Seller behaviour · تعامل البائعة</option><option value="other">Other · حاجة تانية</option></select>

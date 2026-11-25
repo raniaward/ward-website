@@ -4,9 +4,9 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Seller Centre · مركز البائعات — WARD</title>
 <meta name="robots" content="noindex">
-<link rel="icon" href="/favicon.png"><link rel="stylesheet" href="market.css?v=13">
+<link rel="icon" href="/favicon.png"><link rel="stylesheet" href="market.css?v=14">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.min.js"></script>
-<script src="ward.js?v=13"></script>
+<script src="ward.js?v=14"></script>
 </head>
 <body>
 <main class="wrap" id="app"><p class="muted">Loading…</p></main>
@@ -248,6 +248,12 @@ async function casesPane() {
     ((data || []).map(x => `<div class="card"><div class="split"><b>${esc(x.ref)} · order ${esc(x.orders?.ref || '')}</b>${tag(x.status)}</div>
       <p><b>${esc(x.type)}</b>: ${esc(x.message)}</p>${x.resolution ? `<p class="muted">WARD: ${esc(x.resolution)}</p>` : ''}</div>`).join('') || '<p class="muted">No complaints. 🌷</p>');
 }
+async function sponsoredBlock() {
+  const { data } = await sb.from('sponsor_allocations').select('amount,status,paid_at,reference,created_at').eq('seller_id', USER.id).neq('status', 'cancelled').order('created_at', { ascending: false });
+  if (!data || !data.length) return '';
+  return `<h2>Sponsored support · دعم الرعاة</h2><div class="card">${data.map(a => `<div class="split"><span>${fmtDate(a.created_at)} · ${tag(a.status)}${a.reference ? ' · ref ' + esc(a.reference) : ''}</span><b>${aed(a.amount)}</b></div>`).join('')}
+    <p class="muted">Support funded by a WARD sponsor programme. It is separate from your sales. · دعم من برنامج رعاة، منفصل عن مبيعاتك.</p></div>`;
+}
 async function earningsPane() {
   const { data } = await sb.from('orders').select('ref,status,seller_net,commission,vat,gateway_items,items_total,voucher_applied,delivered_at,payout_date,payout_status,payout_paid_at,payout_reference,created_at').eq('seller_id', USER.id).order('created_at', { ascending: false });
   const o = data || [];
@@ -266,6 +272,7 @@ async function earningsPane() {
     ${Object.keys(byDate).sort().map(d => `<div class="split card" style="margin-bottom:8px"><span>${fmtDate(d)}</span><b>${aed(byDate[d])}</b></div>`).join('') || '<p class="muted">Nothing scheduled yet.</p>'}
     <div class="note">Payouts run every 14 days for orders delivered at least 7 days earlier (see <a href="/terms.html" target="_blank">Conditions of Use</a>).<br>
     <span class="ar">التحويل كل 14 يوم للطلبات اللي اتسلمت من 7 أيام أو أكتر.</span></div>`;
+  sponsoredBlock().then(h => { if (h && TAB === 'earnings') $('#pane').insertAdjacentHTML('beforeend', h); });
 }
 
 let SHOPIMG = {};
